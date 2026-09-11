@@ -110,10 +110,24 @@ export async function stubApi(page: Page) {
     if (path.endsWith('/system/info')) return json(route, systemInfo);
 
     if (path.endsWith('/audio') || path.endsWith('/sample')) {
+      // Mirror the real backend (backend/app/api/v1/speech.py) exactly: it
+      // always names the file after the resource id, and only a
+      // Content-Disposition: attachment header actually forces a download.
+      // The HTML `download` attribute on the <a> is honored by the browser
+      // for a same-origin URL, but silently ignored cross-origin -- and in
+      // production the frontend (Pages) and API (Render) *are* different
+      // origins, so this header is what makes the download button work there.
+      const forceDownload = url.searchParams.get('download') === 'true';
+      const resourceId = path.split('/').at(-2) ?? 'clip';
+      const disposition = forceDownload ? 'attachment' : 'inline';
       return route.fulfill({
         status: 200,
         contentType: 'audio/wav',
-        headers: { 'Accept-Ranges': 'bytes', 'Access-Control-Allow-Origin': '*' },
+        headers: {
+          'Accept-Ranges': 'bytes',
+          'Access-Control-Allow-Origin': '*',
+          'Content-Disposition': `${disposition}; filename="${resourceId}.wav"`,
+        },
         body: wavBytes(2),
       });
     }

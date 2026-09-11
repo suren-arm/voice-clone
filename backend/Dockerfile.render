@@ -1,0 +1,68 @@
+# =============================================================================
+# Single-stage CPU image for hosts that build a Dockerfile without support for
+# selecting a multi-stage --target (Render's Blueprint build, and most other
+# "point at a Dockerfile" PaaS backends).
+#
+# backend/Dockerfile already has a `cpu` stage with this exact content, but it
+# is not the file's *last* stage -- `gpu` is -- so an unqualified `docker build`
+# with no --target would build the CUDA image here, which cannot run without a
+# physical GPU. This file exists purely to remove that ambiguity for platforms
+# that always build the last (or only) stage. It is not a fork of the
+# application: any change to how the app installs or starts on CPU belongs in
+# backend/Dockerfile's `cpu` stage, and should be mirrored here.
+#
+# Used by: render.yaml (Render Blueprint). Local development and the GPU path
+# still use backend/Dockerfile via docker-compose.
+# =============================================================================
+FROM python:3.11-slim
+
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PIP_NO_CACHE_DIR=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    HF_HOME=/cache/huggingface
+
+# ffmpeg decodes what browsers actually record (WebM/Opus, MP4/AAC);
+# libsndfile1 backs soundfile; espeak-ng powers the Armenian G2P diagnostics.
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        ffmpeg \
+        libsndfile1 \
+        espeak-ng \
+        curl \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# Install the CPU torch wheels explicitly, before the requirements file pulls
+# chatterbox-tts: the default PyPI wheel for torch drags in the full CUDA stack
+# (~2.5 GB) even on a CPU-only image.
+RUN pip install --index-url https://download.pytorch.org/whl/cpu \
+        torch==2.6.0 torchaudio==2.6.0
+
+COPY backend/requirements.txt /app/backend/requirements.txt
+RUN pip install -r /app/backend/requirements.txt
+
+COPY ai/        /app/ai/
+COPY backend/   /app/backend/
+COPY scripts/   /app/scripts/
+
+# Run as a non-root user; give it the storage tree and the weight cache.
+RUN useradd --create-home --uid 10001 appuser \
+    && mkdir -p /app/storage/voices /app/storage/generated /app/storage/tmp /cache/huggingface \
+    && chown -R appuser:appuser /app /cache
+USER appuser
+
+WORKDIR /app/backend
+
+# Render (and most PaaS hosts) assign the listen port via $PORT at runtime and
+# reject a container that ignores it; 8000 is the fallback for hosts that
+# don't set one (e.g. `docker run -p 8000:8000` of this image directly).
+EXPOSE 8000
+ENV PORT=8000
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=90s --retries=3 \
+    CMD curl -fsS "http://localhost:${PORT:-8000}/health" || exit 1
+
+# One worker on purpose: the model is loaded per process, and a second worker
+# would double memory for no throughput gain on one CPU-bound instance.
+CMD ["sh", "-c", "uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000} --workers 1"]

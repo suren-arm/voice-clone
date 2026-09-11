@@ -1,0 +1,111 @@
+# Render Blueprint for the backend API.
+# https://render.com/docs/blueprint-spec
+#
+# Why Render, given the model comparison in docs/DEPLOYMENT.md: it is the
+# simplest host that (a) builds a plain Dockerfile with no platform-specific
+# rewrite, (b) offers a persistent disk for storage/ and the model cache with
+# no separate volume service to configure, and (c) needs no GPU -- Chatterbox
+# Nano (110M params) runs at roughly real-time speed on CPU, which is what
+# this blueprint deploys. Cloudflare Workers/Pages cannot run this service at
+# all: there is no PyTorch runtime on Workers, so the backend must live on a
+# host that runs an ordinary container.
+#
+# One-time setup (Render has no API-token-free way to create the service):
+#   1. https://dashboard.render.com -> New -> Blueprint -> connect this repo.
+#   2. Render reads this file and proposes one service, "voice-clone-api".
+#   3. Set CORS_ORIGINS (see below) to the Cloudflare Pages URL you get after
+#      deploying frontend/ -- see docs/DEPLOYMENT.md for the exact steps and
+#      why this must be set before the frontend can call the API.
+#   4. Deploy. Render assigns https://voice-clone-api.onrender.com, or
+#      https://voice-clone-api-<hash>.onrender.com if that name is already
+#      taken by another Render account -- the dashboard shows the real URL.
+#   5. Put that URL in the frontend's NEXT_PUBLIC_API_URL (a Cloudflare Pages
+#      build-time environment variable) and redeploy the frontend.
+#
+# To pre-fetch model weights instead of paying that cost on the first request,
+# run once from the Render dashboard's Shell tab:
+#   python ../scripts/download_model.py --variant nano
+
+# NOTE ON SCHEMA: this session has no network access to render.com to
+# validate the blueprint live (see docs/DEPLOYMENT.md for why). The fields
+# below are the long-stable subset of Render's Blueprint spec rather than any
+# newer alias -- if the dashboard flags a field as unrecognized, check
+# https://render.com/docs/blueprint-spec for its current name and fix just
+# that line; the service topology (Docker web service + disk + env vars)
+# is what matters and is not expected to change.
+services:
+  - type: web
+    name: voice-clone-api
+    env: docker
+    dockerfilePath: ./backend/Dockerfile.render
+    dockerContext: .
+    plan: starter
+    # Starter (not Free): the free plan's 512MB RAM is too tight for
+    # torch + a loaded model, and free services spin down on idle, which
+    # would turn every first request after a nap into a ~30s cold load. Model
+    # loading and voice conditioning also need CPU headroom the free plan
+    # does not give you -- see docs/PERFORMANCE.md for what each variant
+    # actually costs to run.
+    region: oregon
+    healthCheckPath: /health
+
+    disk:
+      name: voice-clone-storage
+      mountPath: /app/storage
+      sizeGB: 5
+
+    envVars:
+      - key: ENVIRONMENT
+        value: production
+      - key: LOG_LEVEL
+        value: INFO
+      - key: API_V1_PREFIX
+        value: /api/v1
+
+      # Must be the exact Cloudflare Pages origin(s), comma-separated, no
+      # trailing slash, e.g. https://ai-voice-studio.pages.dev . Left unset
+      # here (sync: false) because the real value only exists after the
+      # frontend's first deploy -- set it in the Render dashboard, not here,
+      # so this blueprint file never goes stale as the Pages URL changes.
+      - key: CORS_ORIGINS
+        sync: false
+
+      - key: STORAGE_DIR
+        value: /app/storage
+      - key: DATABASE_URL
+        value: sqlite:////app/storage/voice_studio.db
+      # Shares the persistent disk rather than a second one -- Render's
+      # Blueprint plans typically allow one disk per service.
+      - key: HF_HOME
+        value: /app/storage/hf-cache
+
+      - key: VOICE_ENGINE
+        value: chatterbox
+      # Nano: 110M params, real-time-ish on CPU. Switch to `multilingual` only
+      # once this runs on an instance with several CPU cores and you have
+      # measured the latency with scripts/benchmark.py -- the 0.5B model is
+      # minutes-per-utterance slow on a small CPU instance.
+      - key: CHATTERBOX_VARIANT
+        value: nano
+      - key: CHATTERBOX_T3_MODEL
+        value: v3
+      - key: DEVICE
+        value: cpu
+      # Loading at boot (rather than on first request) would push Render's
+      # deploy health check past its timeout on a small instance; the first
+      # real request pays that cost once instead.
+      - key: PRELOAD_MODEL
+        value: "false"
+
+      - key: MAX_UPLOAD_BYTES
+        value: "26214400"
+      - key: MAX_TEXT_CHARS
+        value: "2000"
+      - key: MAX_VOICES
+        value: "100"
+      - key: REQUIRE_CONSENT
+        value: "true"
+      - key: RATE_LIMIT_ENABLED
+        value: "true"
+      - key: ENABLE_EXPERIMENTAL_ARMENIAN
+        value: "true"

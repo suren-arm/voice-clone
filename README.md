@@ -440,17 +440,36 @@ scraped audio, or anything designed to remove a watermark.
 
 ## Deployment
 
-Full guide including GPU hosting comparison: **[docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)**
+**Shipped and ready to run:** Cloudflare Pages (frontend) + Render (backend).
+Full walkthrough: **[docs/DEPLOYMENT.md](docs/DEPLOYMENT.md#cloudflare-pages--render-the-shipped-config)**
 
 ```
-Vercel / Netlify / Cloudflare        GPU host (RunPod, Vast.ai, own hardware)
-  Next.js frontend  ──HTTPS──▶       FastAPI + Chatterbox
+Cloudflare Pages                     Render (Docker web service)
+  Next.js static export  ──HTTPS──▶    FastAPI + Chatterbox (CPU, Nano)
+  frontend/out/ · CLOUDFLARE_BUILD=1   render.yaml · backend/Dockerfile.render
 ```
 
-Two things to get right: `NEXT_PUBLIC_API_URL` is compiled into the frontend
-bundle at build time, and `CORS_ORIGINS` on the backend must list the frontend's
-exact origin. **HTTPS is mandatory** — `getUserMedia` refuses to run outside a
-secure context, so microphone recording simply will not work over plain HTTP.
+Cloudflare Workers has no PyTorch runtime, so the backend needs an ordinary
+container host regardless of which Cloudflare product serves the frontend —
+Render was chosen because it builds a plain Dockerfile with a persistent disk
+for `storage/` and the model cache, no separate volume product required. The
+frontend needs no Workers runtime adapter either: every route is already a
+static, client-rendered page, so `next build` with `CLOUDFLARE_BUILD=1`
+produces a plain static export Cloudflare Pages serves directly.
+
+Two things to get right, wherever you deploy: `NEXT_PUBLIC_API_URL` is
+compiled into the frontend bundle at build time (changing it needs a rebuild),
+and `CORS_ORIGINS` on the backend must list the frontend's exact origin, set
+*after* the frontend's first deploy since that's when the URL is assigned.
+**HTTPS is mandatory** — `getUserMedia` refuses to run outside a secure
+context, so microphone recording simply will not work over plain HTTP. Both
+platforms provide HTTPS by default on their `*.pages.dev` / `*.onrender.com`
+domains, so this needs no extra configuration.
+
+Other hosting options (GPU providers for the multilingual model, Vercel/Netlify
+for the frontend, self-hosting both on one box) are still fully documented in
+[docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) — the Cloudflare/Render path above is
+the one this repository ships pre-configured for, not the only one that works.
 
 ---
 
