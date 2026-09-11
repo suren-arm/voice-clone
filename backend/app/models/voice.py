@@ -38,7 +38,9 @@ class Voice(Base):
     reference_duration_seconds: Mapped[float] = mapped_column(Float, nullable=False)
     reference_sample_rate: Mapped[int] = mapped_column(Integer, nullable=False)
     source_container: Mapped[str | None] = mapped_column(String(16), nullable=True)
-    source: Mapped[str] = mapped_column(String(16), nullable=False, default="upload")  # upload|record
+    source: Mapped[str] = mapped_column(
+        String(16), nullable=False, default="upload"
+    )  # upload|record
 
     # -- consent / safety --------------------------------------------------
     consent_given: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
@@ -52,7 +54,7 @@ class Voice(Base):
     generation_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     last_used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
-    generations: Mapped[list["Generation"]] = relationship(  # noqa: F821
+    generations: Mapped[list[Generation]] = relationship(  # noqa: F821
         back_populates="voice", cascade="all, delete-orphan", passive_deletes=False
     )
 

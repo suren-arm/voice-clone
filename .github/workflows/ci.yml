@@ -131,6 +131,13 @@ jobs:
 
       - uses: docker/setup-buildx-action@v3
 
+      # `load: true` (not the previous `false`) on every image below is
+      # deliberate: a build that only pushes to the layer cache never gets
+      # executed, so a container that builds fine but crashes on start --
+      # e.g. importing a module that silently never made it into the git
+      # tree, which is exactly what shipped past this job once already --
+      # would still report success. Loading the image and actually starting
+      # it is the only thing that catches that class of bug here.
       - name: Build backend image (CPU target)
         uses: docker/build-push-action@v6
         with:
@@ -138,18 +145,88 @@ jobs:
           file: backend/Dockerfile
           target: cpu
           push: false
-          load: false
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          load: true
+          tags: voice-studio-api:cpu-ci
+          cache-from: type=gha,scope=backend-cpu
+          cache-to: type=gha,mode=max,scope=backend-cpu
 
-      - name: Build frontend image
+      - name: Build backend image (Render target)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: backend/Dockerfile.render
+          push: false
+          load: true
+          tags: voice-studio-api:render-ci
+          cache-from: type=gha,scope=backend-render
+          cache-to: type=gha,mode=max,scope=backend-render
+
+      - name: Smoke-test the backend images actually start and serve /health
+        run: |
+          set -euo pipefail
+          for tag in voice-studio-api:cpu-ci voice-studio-api:render-ci; do
+            echo "--- $tag ---"
+            cid=$(docker run -d -p 8000:8000 -e VOICE_ENGINE=mock -e PORT=8000 "$tag")
+            ok=false
+            for _ in $(seq 1 30); do
+              if curl -fsS http://localhost:8000/health; then
+                ok=true
+                break
+              fi
+              sleep 1
+            done
+            docker logs "$cid"
+            docker rm -f "$cid" >/dev/null
+            if [ "$ok" != true ]; then
+              echo "::error::$tag did not answer /health within 30s"
+              exit 1
+            fi
+            echo
+          done
+
+      - name: Build frontend image (Docker/standalone target)
         uses: docker/build-push-action@v6
         with:
           context: ./frontend
           file: ./frontend/Dockerfile
           push: false
-          load: false
+          load: true
+          tags: voice-studio-web:ci
           build-args: |
             NEXT_PUBLIC_API_URL=http://localhost:8000
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-from: type=gha,scope=frontend-docker
+          cache-to: type=gha,mode=max,scope=frontend-docker
+
+      - name: Smoke-test the frontend image actually starts and serves /
+        run: |
+          set -euo pipefail
+          cid=$(docker run -d -p 3000:3000 voice-studio-web:ci)
+          ok=false
+          for _ in $(seq 1 30); do
+            if curl -fsS http://localhost:3000/ > /dev/null; then
+              ok=true
+              break
+            fi
+            sleep 1
+          done
+          docker logs "$cid"
+          docker rm -f "$cid" >/dev/null
+          if [ "$ok" != true ]; then
+            echo "::error::frontend image did not answer / within 30s"
+            exit 1
+          fi
+
+      - name: Build frontend static export (Cloudflare Pages target)
+        working-directory: frontend
+        run: |
+          # Not a Docker build -- Cloudflare Pages builds this directly with
+          # Node, no image involved (see render.yaml's sibling doc,
+          # docs/DEPLOYMENT.md#cloudflare-pages--render-the-shipped-config).
+          # Verified here anyway, since it is the other half of what actually
+          # ships, and a static-export-only regression (e.g. reintroducing a
+          # server-only feature next.config.ts can't export) would otherwise
+          # only surface on a real Cloudflare deploy.
+          npm ci
+          CLOUDFLARE_BUILD=1 NEXT_PUBLIC_API_URL=http://localhost:8000 npm run build
+          test -f out/index.html
+          test -f out/404.html

@@ -42,7 +42,7 @@ class Generation(Base):
         DateTime(timezone=True), default=utcnow, nullable=False, index=True
     )
 
-    voice: Mapped["Voice"] = relationship(back_populates="generations")  # noqa: F821
+    voice: Mapped[Voice] = relationship(back_populates="generations")  # noqa: F821
 
     def __repr__(self) -> str:  # pragma: no cover
         return f"<Generation {self.id} voice={self.voice_id} {self.duration_seconds:.1f}s>"
