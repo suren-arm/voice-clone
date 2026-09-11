@@ -1,0 +1,133 @@
+"""Typed application settings, loaded from the environment / ``.env``."""
+
+from __future__ import annotations
+
+import functools
+from pathlib import Path
+from typing import Literal
+
+from pydantic import Field, field_validator
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+REPO_ROOT = Path(__file__).resolve().parents[3]
+
+
+class Settings(BaseSettings):
+    model_config = SettingsConfigDict(
+        env_file=(REPO_ROOT / ".env", REPO_ROOT / "backend" / ".env"),
+        env_file_encoding="utf-8",
+        extra="ignore",
+        case_sensitive=False,
+    )
+
+    # -- app ---------------------------------------------------------------
+    app_name: str = "AI Voice Studio"
+    environment: Literal["development", "production", "test"] = "development"
+    log_level: str = "INFO"
+    api_v1_prefix: str = "/api/v1"
+
+    # -- server ------------------------------------------------------------
+    host: str = "0.0.0.0"
+    port: int = 8000
+
+    # -- cors --------------------------------------------------------------
+    cors_origins: list[str] = Field(
+        default_factory=lambda: ["http://localhost:3000", "http://127.0.0.1:3000"]
+    )
+
+    # -- storage -----------------------------------------------------------
+    storage_dir: Path = Path("storage")
+    database_url: str = "sqlite:///storage/voice_studio.db"
+
+    # -- engine ------------------------------------------------------------
+    voice_engine: str = "chatterbox"
+    chatterbox_variant: Literal["multilingual", "english", "turbo", "nano"] = "multilingual"
+    chatterbox_t3_model: str = "v3"
+    device: str = "auto"
+    preload_model: bool = False
+
+    default_exaggeration: float = 0.5
+    default_cfg_weight: float = 0.5
+    default_temperature: float = 0.8
+
+    # -- limits ------------------------------------------------------------
+    max_upload_bytes: int = 25 * 1024 * 1024
+    min_reference_seconds: float = 3.0
+    max_reference_seconds: float = 120.0
+    max_text_chars: int = 2000
+    max_voices: int = 100
+    generation_timeout_seconds: int = 300
+    require_consent: bool = True
+
+    # -- rate limiting -----------------------------------------------------
+    rate_limit_enabled: bool = True
+    rate_limit_voice_create_per_hour: int = 20
+    rate_limit_speech_per_hour: int = 120
+    rate_limit_global_per_minute: int = 240
+
+    # -- experimental ------------------------------------------------------
+    enable_experimental_armenian: bool = True
+
+    # -- validators --------------------------------------------------------
+    @field_validator("cors_origins", mode="before")
+    @classmethod
+    def _split_origins(cls, value: object) -> object:
+        if isinstance(value, str):
+            return [origin.strip() for origin in value.split(",") if origin.strip()]
+        return value
+
+    @field_validator("storage_dir", mode="after")
+    @classmethod
+    def _absolute_storage(cls, value: Path) -> Path:
+        return value if value.is_absolute() else (REPO_ROOT / value).resolve()
+
+    # -- derived -----------------------------------------------------------
+    @property
+    def voices_dir(self) -> Path:
+        return self.storage_dir / "voices"
+
+    @property
+    def generated_dir(self) -> Path:
+        return self.storage_dir / "generated"
+
+    @property
+    def tmp_dir(self) -> Path:
+        return self.storage_dir / "tmp"
+
+    @property
+    def is_production(self) -> bool:
+        return self.environment == "production"
+
+    def resolved_database_url(self) -> str:
+        """Make a relative SQLite path absolute w.r.t. the repository root."""
+        prefix = "sqlite:///"
+        if not self.database_url.startswith(prefix):
+            return self.database_url
+        raw = self.database_url[len(prefix) :]
+        path = Path(raw)
+        if not path.is_absolute():
+            path = (REPO_ROOT / path).resolve()
+        path.parent.mkdir(parents=True, exist_ok=True)
+        return f"{prefix}{path}"
+
+    def ensure_directories(self) -> None:
+        for directory in (self.storage_dir, self.voices_dir, self.generated_dir, self.tmp_dir):
+            directory.mkdir(parents=True, exist_ok=True)
+
+    def engine_kwargs(self) -> dict[str, object]:
+        """Constructor arguments for the configured engine."""
+        if self.voice_engine == "chatterbox":
+            return {
+                "variant": self.chatterbox_variant,
+                "device": self.device,
+                "t3_model": self.chatterbox_t3_model,
+                "default_exaggeration": self.default_exaggeration,
+                "default_cfg_weight": self.default_cfg_weight,
+                "default_temperature": self.default_temperature,
+            }
+        return {}
+
+
+@functools.lru_cache
+def get_settings() -> Settings:
+    return Settings()

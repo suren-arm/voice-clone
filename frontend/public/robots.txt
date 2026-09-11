@@ -1,0 +1,3 @@
+# Voice profiles are personal data. Keep this app out of search indexes.
+User-agent: *
+Disallow: /

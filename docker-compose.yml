@@ -1,0 +1,58 @@
+# =============================================================================
+# CPU development stack:  docker compose up --build
+# GPU stack:              docker compose -f docker-compose.yml -f docker-compose.gpu.yml up --build
+#
+# Frontend -> http://localhost:3000
+# API docs -> http://localhost:8000/docs
+# =============================================================================
+
+services:
+  api:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+      target: cpu
+    image: voice-studio-api:cpu
+    ports:
+      - "8000:8000"
+    environment:
+      ENVIRONMENT: ${ENVIRONMENT:-development}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000}
+      STORAGE_DIR: /app/storage
+      DATABASE_URL: sqlite:////app/storage/voice_studio.db
+      VOICE_ENGINE: ${VOICE_ENGINE:-chatterbox}
+      # Nano is the sensible CPU default: 110M parameters, ~3x realtime on
+      # 8 cores. The 0.5B multilingual model on CPU is minutes per utterance.
+      CHATTERBOX_VARIANT: ${CHATTERBOX_VARIANT:-nano}
+      CHATTERBOX_T3_MODEL: ${CHATTERBOX_T3_MODEL:-v3}
+      DEVICE: cpu
+      PRELOAD_MODEL: ${PRELOAD_MODEL:-false}
+      HF_HOME: /cache/huggingface
+      MAX_TEXT_CHARS: ${MAX_TEXT_CHARS:-2000}
+      ENABLE_EXPERIMENTAL_ARMENIAN: ${ENABLE_EXPERIMENTAL_ARMENIAN:-true}
+    volumes:
+      # Persist user data and downloaded weights across rebuilds.
+      - ./storage:/app/storage
+      - hf-cache:/cache/huggingface
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        # Baked in at build time: Next.js inlines NEXT_PUBLIC_* into the bundle.
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8000}
+    image: voice-studio-web:latest
+    ports:
+      - "3000:3000"
+    environment:
+      NODE_ENV: production
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8000}
+    depends_on:
+      - api
+    restart: unless-stopped
+
+volumes:
+  hf-cache:

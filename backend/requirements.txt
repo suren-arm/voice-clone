@@ -1,0 +1,21 @@
+# ---- Web layer -------------------------------------------------------------
+fastapi==0.121.2
+uvicorn[standard]==0.41.0
+python-multipart==0.0.20
+pydantic==2.12.4
+pydantic-settings==2.13.1
+
+# ---- Persistence -----------------------------------------------------------
+SQLAlchemy==2.0.45
+
+# ---- Audio -----------------------------------------------------------------
+# numpy is pinned <2 because chatterbox-tts pins it there for Python < 3.13.
+numpy==1.26.4
+soundfile==0.13.1
+
+# ---- Voice cloning engine --------------------------------------------------
+# Chatterbox pulls torch, torchaudio, transformers, librosa, s3tokenizer and
+# resemble-perth itself. Install a CUDA build of torch first if you want GPU:
+#   pip install torch==2.6.0 torchaudio==2.6.0 --index-url https://download.pytorch.org/whl/cu124
+# Model *weights* are never vendored -- see scripts/download_model.py.
+chatterbox-tts==0.1.7

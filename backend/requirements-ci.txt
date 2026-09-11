@@ -1,0 +1,17 @@
+# Dependency set for CI and for running the API against the mock engine.
+# Deliberately excludes chatterbox-tts (and therefore torch): CI must not pull
+# gigabytes of wheels, and the mock engine exercises every code path the API
+# owns. AI integration tests run separately -- see .github/workflows/ci.yml.
+fastapi==0.121.2
+uvicorn[standard]==0.41.0
+python-multipart==0.0.20
+pydantic==2.12.4
+pydantic-settings==2.13.1
+SQLAlchemy==2.0.45
+numpy==1.26.4
+soundfile==0.13.1
+
+pytest==9.0.2
+pytest-cov==7.0.0
+httpx==0.28.1
+ruff==0.15.4

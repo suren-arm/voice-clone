@@ -1,0 +1,60 @@
+# ---- Python ----
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+htmlcov/
+.coverage
+coverage.xml
+
+# ---- Node / Next.js ----
+node_modules/
+.next/
+out/
+dist/
+build/
+*.tsbuildinfo
+.eslintcache
+playwright-report/
+test-results/
+blob-report/
+coverage/
+
+# ---- Environment ----
+.env
+.env.local
+.env.*.local
+!.env.example
+
+# ---- Runtime data (never commit user audio or the SQLite DB) ----
+storage/voices/*
+storage/generated/*
+storage/tmp/*
+!storage/voices/.gitkeep
+!storage/generated/.gitkeep
+!storage/tmp/.gitkeep
+*.db
+*.db-journal
+*.sqlite3
+
+# ---- Model weights: NEVER commit these (multi-GB) ----
+models/
+checkpoints/
+*.safetensors
+*.ckpt
+*.pt
+*.pth
+*.bin
+*.onnx
+.cache/huggingface/
+
+# ---- OS / editor ----
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp

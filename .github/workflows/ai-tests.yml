@@ -1,0 +1,47 @@
+name: AI integration tests
+
+# Real model weights, on demand only. These download several gigabytes and are
+# slow on CPU, so they never run on the pull-request path -- see ci.yml.
+on:
+  workflow_dispatch:
+    inputs:
+      variant:
+        description: Chatterbox variant to test
+        type: choice
+        options: [nano, turbo, english, multilingual]
+        default: nano
+  schedule:
+    # Weekly, to catch upstream model or dependency drift.
+    - cron: '0 4 * * 1'
+
+jobs:
+  ai:
+    name: Real model
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - run: sudo apt-get update && sudo apt-get install -y --no-install-recommends ffmpeg libsndfile1
+
+      - name: Cache model weights
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/huggingface
+          key: hf-${{ inputs.variant || 'nano' }}-${{ hashFiles('backend/requirements.txt') }}
+
+      - name: Install (CPU torch)
+        run: |
+          pip install --index-url https://download.pytorch.org/whl/cpu torch==2.6.0 torchaudio==2.6.0
+          pip install -r backend/requirements.txt pytest==9.0.2
+
+      - name: Run AI tests
+        working-directory: backend
+        env:
+          DEVICE: cpu
+          CHATTERBOX_VARIANT: ${{ inputs.variant || 'nano' }}
+        run: pytest -m ai tests/ai -v

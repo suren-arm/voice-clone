@@ -1,0 +1,19 @@
+[project]
+name = "voice-studio-backend"
+version = "0.1.0"
+description = "FastAPI backend for the AI Voice Studio voice cloning web app"
+requires-python = ">=3.10"
+
+[tool.pytest.ini_options]
+# `..` puts the repository-root `ai/` package on the path; `.` puts `app` there.
+pythonpath = [".", ".."]
+testpaths = ["tests"]
+addopts = "-q --strict-markers -m 'not ai'"
+filterwarnings = [
+    "ignore::DeprecationWarning:starlette.*",
+]
+markers = [
+    "ai: loads real model weights; slow and requires a download (deselected by default)",
+    "integration: exercises several layers together",
+]
+

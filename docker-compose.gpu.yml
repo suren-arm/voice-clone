@@ -1,0 +1,26 @@
+# GPU overlay. Requires the NVIDIA Container Toolkit on the host:
+#   https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html
+#
+#   docker compose -f docker-compose.yml -f docker-compose.gpu.yml up --build
+#
+# Verify the GPU is visible from inside the container:
+#   docker compose exec api python -c "import torch; print(torch.cuda.get_device_name(0))"
+
+services:
+  api:
+    build:
+      target: gpu
+    image: voice-studio-api:gpu
+    environment:
+      DEVICE: cuda
+      # With a GPU there is no reason to run the small English-only model.
+      CHATTERBOX_VARIANT: ${CHATTERBOX_VARIANT:-multilingual}
+      # Load weights at boot so the first user request is not the one that waits.
+      PRELOAD_MODEL: "true"
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
