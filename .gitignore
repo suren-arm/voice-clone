@@ -42,8 +42,15 @@ storage/tmp/*
 *.sqlite3
 
 # ---- Model weights: NEVER commit these (multi-GB) ----
-models/
-checkpoints/
+# Anchored to the repo root (leading slash): an unanchored `models/` matches at
+# *any* depth and silently swallowed backend/app/models/ -- the ORM models the
+# whole backend imports -- out of every commit without any error or warning.
+# `git status` looked clean because git was correctly doing what it was told;
+# the pattern was just wrong. Confirmed via `git ls-files backend/app/models/`
+# returning nothing despite the files existing on disk and `git check-ignore`
+# naming this exact line as the reason.
+/models/
+/checkpoints/
 *.safetensors
 *.ckpt
 *.pt
