@@ -2,6 +2,10 @@ name: Scratch research
 
 on:
   workflow_dispatch:
+  push:
+    branches: [claude/vibrant-keller-svtt3z]
+    paths:
+      - '.github/workflows/_scratch-research.yml'
 
 jobs:
   research:
