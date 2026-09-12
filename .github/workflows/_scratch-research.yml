@@ -34,6 +34,21 @@ jobs:
           echo "=== mms-tts-hye model card (raw README) ==="
           curl -sSL "https://huggingface.co/facebook/mms-tts-hye/raw/main/README.md" | head -40 || echo "fetch failed"
 
+      - name: Dump full hy_AM-gor-medium voice entry (license, dataset, sample rate)
+        run: |
+          python3 - <<'PYEOF'
+          import json
+          data = json.load(open('/tmp/voices.json'))
+          for key, v in data.items():
+              if key.startswith('hy_AM'):
+                  print(json.dumps(v, indent=2))
+          PYEOF
+          echo "=== the voice repo's own per-voice card, if any ==="
+          curl -sSL "https://huggingface.co/rhasspy/piper-voices/raw/main/hy/hy_AM/gor/medium/MODEL_CARD" || echo "no MODEL_CARD at that path"
+          echo ""
+          echo "=== rhasspy/piper-voices repo README license section ==="
+          curl -sSL "https://huggingface.co/rhasspy/piper-voices/raw/main/README.md" | head -60 || echo "fetch failed"
+
       - name: Check for any other Armenian open TTS on HF (search API)
         run: |
           curl -sSL "https://huggingface.co/api/models?search=armenian%20tts&limit=20" -o /tmp/search1.json || true
