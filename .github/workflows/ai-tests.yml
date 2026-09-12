@@ -15,7 +15,7 @@ name: AI integration tests
 # confirming manual dispatch still works.
 on:
   push:
-    branches: [main]
+    branches: [master, main]
     paths:
       - 'ai/**'
       - 'backend/tests/ai/**'

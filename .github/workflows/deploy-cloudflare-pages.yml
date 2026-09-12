@@ -24,7 +24,7 @@ name: Deploy frontend to Cloudflare Pages
 
 on:
   push:
-    branches: [main]
+    branches: [master, main]
     paths:
       - 'frontend/**'
       - '.github/workflows/deploy-cloudflare-pages.yml'
@@ -134,6 +134,15 @@ jobs:
           echo "subdomain=$subdomain" >> "$GITHUB_OUTPUT"
 
       - name: Publish to Cloudflare Pages
+        # branch is pinned to "main" (the project's production_branch, set
+        # once at project creation) regardless of which git branch actually
+        # triggered this workflow. Without this, cloudflare/pages-action
+        # reports whatever branch/ref is checked out, and any mismatch with
+        # production_branch makes Cloudflare treat the deploy as a *preview*
+        # -- it gets its own unique URL but never updates the production
+        # alias domain (ai-voice-studio-660.pages.dev), which keeps serving
+        # the last real production deploy indefinitely. This bit us for real
+        # after this repo's working branch changed to "master".
         if: steps.preflight.outputs.configured == 'true'
         uses: cloudflare/pages-action@v1
         with:
@@ -142,6 +151,7 @@ jobs:
           projectName: ${{ vars.CLOUDFLARE_PAGES_PROJECT || 'ai-voice-studio' }}
           directory: frontend/out
           gitHubToken: ${{ secrets.GITHUB_TOKEN }}
+          branch: main
 
       - name: Verify the deployment is actually reachable
         # A "success" from pages-action means Cloudflare accepted the upload,
