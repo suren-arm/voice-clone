@@ -1,16 +1,33 @@
 """Chatterbox (Resemble AI) implementation of :class:`VoiceCloningEngine`.
 
-Verified against upstream ``resemble-ai/chatterbox`` @ master, 2026-09-11:
+Verified against the actual installed package, ``chatterbox-tts==0.1.7`` (the
+latest release on PyPI), 2026-09-12 -- by installing it and inspecting the
+real class signatures directly, not by reading GitHub's ``main`` branch. The
+two differ: ``main`` has since grown a Nano checkpoint and multilingual
+checkpoint-version selection that this pinned release does not expose. Do not
+"fix" the calls below to match ``main`` without first confirming a matching
+PyPI release exists -- see the git history of this file for what that looked
+like and why it crashed in production.
 
-* ``ChatterboxMultilingualTTS.from_pretrained(device, t3_model="v3")`` and
-  ``.generate(text, language_id, audio_prompt_path=..., exaggeration=...,
-  cfg_weight=..., temperature=..., repetition_penalty=..., min_p=..., top_p=...)``
-* ``ChatterboxTTS`` (English) and ``ChatterboxTurboTTS`` (Turbo / Nano, English)
-  expose ``generate(text, audio_prompt_path=..., ...)`` with no ``language_id``.
-* ``model.sr`` is ``S3GEN_SR == 24000``.
-* ``SUPPORTED_LANGUAGES`` is a 23-entry ``{code: name}`` dict.
+* ``ChatterboxMultilingualTTS.from_pretrained(device)`` -- no checkpoint
+  selection; always loads the ``t3_mtl23ls_v2`` checkpoint.
+* ``ChatterboxTTS.from_pretrained(device)`` (English) and
+  ``ChatterboxTurboTTS.from_pretrained(device)`` (Turbo, 350M, English) --
+  also no extra keyword arguments. There is no Nano checkpoint available
+  through this class in this release; ``nano`` is consequently not offered as
+  a variant here (offering it would mean a variant name whose reported size
+  and behaviour don't match what actually loads).
+* All three ``generate(text, ..., audio_prompt_path=..., exaggeration=...,
+  cfg_weight=..., temperature=..., repetition_penalty=..., min_p=..., top_p=...)``;
+  only the multilingual one also takes ``language_id``.
+* ``model.sr`` is ``S3GEN_SR == 24000`` for all three.
+* ``SUPPORTED_LANGUAGES`` is a 23-entry ``{code: name}`` dict (multilingual only).
 * ``prepare_conditionals(wav_path, exaggeration=...)`` populates ``model.conds``,
-  a ``Conditionals`` dataclass with ``.save(path)`` / ``.load(path)``.
+  a ``Conditionals`` dataclass with ``.save(path)`` / ``.load(path)`` -- but
+  **each of the three modules defines its own distinct ``Conditionals``
+  class** (verified: none of the three are the same object), so loading a
+  cache back requires importing the class from the same module the engine's
+  own variant uses, not a single shared one.
 
 That last point is what makes a *voice profile* cheap here: the expensive part
 of cloning (speaker encoder + speech tokenizer + S3Gen reference embedding) is
@@ -77,7 +94,11 @@ SUPPORTED_LANGUAGES: dict[str, str] = {
 
 ENGLISH_ONLY_LANGUAGES = {"en": "English"}
 
-_VARIANTS = {"multilingual", "english", "turbo", "nano"}
+#: "nano" is deliberately not offered: chatterbox-tts 0.1.7 has no Nano
+#: checkpoint reachable through any public API, so a "nano" variant here
+#: would silently load the 350M Turbo model while claiming a smaller one.
+#: "turbo" is the CPU-appropriate choice this package actually provides.
+_VARIANTS = {"multilingual", "english", "turbo"}
 
 
 class ChatterboxEngine(VoiceCloningEngine):
@@ -90,7 +111,6 @@ class ChatterboxEngine(VoiceCloningEngine):
         *,
         variant: str = "multilingual",
         device: str = "auto",
-        t3_model: str = "v3",
         default_exaggeration: float = 0.5,
         default_cfg_weight: float = 0.5,
         default_temperature: float = 0.8,
@@ -101,7 +121,6 @@ class ChatterboxEngine(VoiceCloningEngine):
                 f"{', '.join(sorted(_VARIANTS))}"
             )
         self.variant = variant
-        self.t3_model = t3_model
         self.device = resolve_device(device)
         self.default_exaggeration = default_exaggeration
         self.default_cfg_weight = default_cfg_weight
@@ -128,12 +147,7 @@ class ChatterboxEngine(VoiceCloningEngine):
             if self._model is not None:  # re-check under lock
                 return
             started = time.perf_counter()
-            logger.info(
-                "Loading Chatterbox variant=%s device=%s t3_model=%s",
-                self.variant,
-                self.device,
-                self.t3_model,
-            )
+            logger.info("Loading Chatterbox variant=%s device=%s", self.variant, self.device)
             try:
                 self._model = self._build_model()
             except Exception as exc:
@@ -144,9 +158,7 @@ class ChatterboxEngine(VoiceCloningEngine):
         if self.variant == "multilingual":
             from chatterbox.mtl_tts import ChatterboxMultilingualTTS
 
-            return ChatterboxMultilingualTTS.from_pretrained(
-                device=self.device, t3_model=self.t3_model
-            )
+            return ChatterboxMultilingualTTS.from_pretrained(device=self.device)
         if self.variant == "english":
             from chatterbox.tts import ChatterboxTTS
 
@@ -154,7 +166,7 @@ class ChatterboxEngine(VoiceCloningEngine):
 
         from chatterbox.tts_turbo import ChatterboxTurboTTS
 
-        return ChatterboxTurboTTS.from_pretrained(device=self.device, nano=(self.variant == "nano"))
+        return ChatterboxTurboTTS.from_pretrained(device=self.device)
 
     def unload(self) -> None:
         with self._lock:
@@ -178,7 +190,6 @@ class ChatterboxEngine(VoiceCloningEngine):
             "multilingual": "0.5B",
             "english": "0.5B",
             "turbo": "350M",
-            "nano": "110M",
         }
         return EngineInfo(
             name=self.name,
@@ -237,13 +248,38 @@ class ChatterboxEngine(VoiceCloningEngine):
             engine=self.name,
             metadata={
                 "variant": self.variant,
-                "t3_model": self.t3_model,
                 "conditioning_seconds": round(elapsed, 3),
                 # Chatterbox uses at most the first 6s (speech-token prompt) and
                 # 10s (S3Gen reference) of the clip.
                 "reference_window_seconds": 10,
             },
         )
+
+    def _conditionals_class(self):
+        """The ``Conditionals`` dataclass for this variant's module.
+
+        Each of chatterbox's three model modules (``mtl_tts``, ``tts``,
+        ``tts_turbo``) defines its own distinct ``Conditionals`` class --
+        verified directly against the installed package, not assumed -- so a
+        cache saved by one must be loaded back with the same one. Picking this
+        from ``self.variant`` rather than inspecting ``self._model.conds`` at
+        call time matters because that attribute is still ``None`` the first
+        time this process loads an *existing* voice (nothing has called
+        ``prepare_conditionals`` on this model instance yet), which is the
+        common case right after a restart or on a freshly started worker.
+        """
+        if self.variant == "multilingual":
+            from chatterbox.mtl_tts import Conditionals
+
+            return Conditionals
+        if self.variant == "english":
+            from chatterbox.tts import Conditionals
+
+            return Conditionals
+
+        from chatterbox.tts_turbo import Conditionals
+
+        return Conditionals
 
     def _apply_conditioning(self, profile: VoiceProfile) -> str | None:
         """Load cached conditioning; return a fallback reference path if not.
@@ -256,15 +292,7 @@ class ChatterboxEngine(VoiceCloningEngine):
         reusable = cache is not None and profile.engine == self.name and Path(cache).is_file()
         if reusable:
             try:
-                from chatterbox.mtl_tts import Conditionals as MTLConditionals
-
-                conds_cls = (
-                    MTLConditionals
-                    if self.variant == "multilingual"
-                    else self._model.conds.__class__
-                    if getattr(self._model, "conds", None) is not None
-                    else MTLConditionals
-                )
+                conds_cls = self._conditionals_class()
                 self._model.conds = conds_cls.load(cache, map_location=self.device).to(self.device)
                 return None
             except Exception as exc:  # noqa: BLE001 - cache is disposable

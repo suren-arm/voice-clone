@@ -22,10 +22,12 @@ services:
       STORAGE_DIR: /app/storage
       DATABASE_URL: sqlite:////app/storage/voice_studio.db
       VOICE_ENGINE: ${VOICE_ENGINE:-chatterbox}
-      # Nano is the sensible CPU default: 110M parameters, ~3x realtime on
-      # 8 cores. The 0.5B multilingual model on CPU is minutes per utterance.
-      CHATTERBOX_VARIANT: ${CHATTERBOX_VARIANT:-nano}
-      CHATTERBOX_T3_MODEL: ${CHATTERBOX_T3_MODEL:-v3}
+      # Turbo is the sensible CPU default: 350M parameters, the smallest
+      # variant chatterbox-tts actually provides (see
+      # ai/chatterbox_engine.py -- a "Nano" checkpoint is not reachable
+      # through this package's public API). The 0.5B multilingual model on
+      # CPU is minutes per utterance.
+      CHATTERBOX_VARIANT: ${CHATTERBOX_VARIANT:-turbo}
       DEVICE: cpu
       PRELOAD_MODEL: ${PRELOAD_MODEL:-false}
       HF_HOME: /cache/huggingface

@@ -41,8 +41,11 @@ class Settings(BaseSettings):
 
     # -- engine ------------------------------------------------------------
     voice_engine: str = "chatterbox"
-    chatterbox_variant: Literal["multilingual", "english", "turbo", "nano"] = "multilingual"
-    chatterbox_t3_model: str = "v3"
+    # "nano" is not offered: chatterbox-tts 0.1.7 (the pinned PyPI release)
+    # has no Nano checkpoint reachable through any public API -- see
+    # ai/chatterbox_engine.py's module docstring. "turbo" (350M) is the
+    # CPU-appropriate choice this package actually provides.
+    chatterbox_variant: Literal["multilingual", "english", "turbo"] = "multilingual"
     device: str = "auto"
     preload_model: bool = False
 
@@ -120,7 +123,6 @@ class Settings(BaseSettings):
             return {
                 "variant": self.chatterbox_variant,
                 "device": self.device,
-                "t3_model": self.chatterbox_t3_model,
                 "default_exaggeration": self.default_exaggeration,
                 "default_cfg_weight": self.default_cfg_weight,
                 "default_temperature": self.default_temperature,

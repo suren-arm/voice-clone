@@ -123,7 +123,7 @@ curl -s https://voice-clone-api.onrender.com/health
 # {"status":"ok","engineLoaded":false,"version":"0.1.0"}
 
 curl -s https://voice-clone-api.onrender.com/api/v1/system/info | python3 -m json.tool
-# engine.device should read "cpu"; engine.variant should read "nano"
+# engine.device should read "cpu"; engine.variant should read "turbo"
 ```
 
 Then open the Pages URL in a browser with the developer console open: the

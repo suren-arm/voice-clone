@@ -25,8 +25,8 @@ on:
       variant:
         description: Chatterbox variant to test
         type: choice
-        options: [nano, turbo, english, multilingual]
-        default: nano
+        options: [turbo, english, multilingual]
+        default: turbo
   schedule:
     # Weekly, to catch upstream model or dependency drift.
     - cron: '0 4 * * 1'
@@ -52,7 +52,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.cache/huggingface
-          key: hf-${{ inputs.variant || 'nano' }}-${{ hashFiles('backend/requirements.txt') }}
+          key: hf-${{ inputs.variant || 'turbo' }}-${{ hashFiles('backend/requirements.txt') }}
 
       - name: Install (CPU torch)
         run: |
@@ -63,5 +63,5 @@ jobs:
         working-directory: backend
         env:
           DEVICE: cpu
-          CHATTERBOX_VARIANT: ${{ inputs.variant || 'nano' }}
+          CHATTERBOX_VARIANT: ${{ inputs.variant || 'turbo' }}
         run: pytest -m ai tests/ai -v

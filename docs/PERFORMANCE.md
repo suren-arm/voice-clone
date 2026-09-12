@@ -47,7 +47,12 @@ synchronous versus queued generation:
 
 **Verified as claims, not as measurements on my hardware:**
 
-- Chatterbox-Nano (110M): "3× faster than realtime on 8 CPU cores" — Resemble AI
+- Chatterbox-Turbo (350M): single-step decoder, designed for low-latency
+  voice agents — Resemble AI. (A smaller "Nano" checkpoint is documented for
+  the model family generally, but is not reachable through any public API in
+  `chatterbox-tts` 0.1.7, the pinned PyPI release -- see
+  `ai/chatterbox_engine.py`'s module docstring. Turbo is what this project
+  actually runs on CPU.)
 - F5-TTS Base + Vocos: ~0.04 RTF on an L20 GPU at 16 NFE steps — the F5-TTS repo
 - CosyVoice 2: 150 ms first-packet latency in streaming mode — CosyVoice repo
 
@@ -63,11 +68,11 @@ above — not measured here. Treat as a starting point for your own benchmark ru
 | RTX 4090 / A10G / L4 | Multilingual 0.5B | well under 1.0 | The comfortable target |
 | RTX 3060 12 GB | Multilingual 0.5B | under 1.0 | Fine for personal use |
 | Apple M-series (MPS) | Multilingual 0.5B | around 1.0 | Good for development |
-| 8-core CPU | **Nano 110M** | ~0.33 (vendor) | The CPU-viable path |
+| 8-core CPU | **Turbo 350M** | sub-1.0 expected (unverified here) | The CPU-viable path |
 | 8-core CPU | Multilingual 0.5B | well above 1.0 | Development only — expect minutes |
 
 The `CHATTERBOX_VARIANT` setting exists precisely for this: `docker-compose.yml`
-defaults the CPU stack to `nano`, and the GPU overlay switches to
+defaults the CPU stack to `turbo`, and the GPU overlay switches to
 `multilingual`.
 
 ## Hardware recommendations
@@ -75,9 +80,9 @@ defaults the CPU stack to `nano`, and the GPU overlay switches to
 ### Development
 
 ```
-CPU:      4+ cores (8 recommended for the Nano CPU path)
+CPU:      4+ cores
 RAM:      16 GB
-GPU:      optional — CPU + Nano, or the mock engine, is enough for the whole app
+GPU:      optional — CPU + Turbo, or the mock engine, is enough for the whole app
 VRAM:     n/a on CPU
 Storage:  20 GB (model weights ~2–3 GB, plus PyTorch and CUDA wheels)
 ```
@@ -105,7 +110,7 @@ request does not pay the load cost.
 CPU:      8+ cores
 RAM:      16 GB
 GPU:      none
-Variant:  nano  (CHATTERBOX_VARIANT=nano)
+Variant:  turbo  (CHATTERBOX_VARIANT=turbo)
 ```
 
 English only, and lower quality than the 0.5B model — but it works, and it costs
@@ -132,7 +137,7 @@ still succeeds.
 
 | Lever | Effect |
 |---|---|
-| `CHATTERBOX_VARIANT=nano` / `turbo` | Much faster, English only. Turbo's decoder is distilled to a single step |
+| `CHATTERBOX_VARIANT=turbo` | Much faster, English only. Its decoder is distilled to a single step. (`nano` is not a real option in the pinned `chatterbox-tts` release -- see README's known limitations) |
 | `PRELOAD_MODEL=true` | Moves the load cost from the first request to container start |
 | `MAX_TEXT_CHARS` | Directly caps worst-case request latency |
 | fp16 on GPU | Roughly halves VRAM; quality impact is model-dependent — measure |

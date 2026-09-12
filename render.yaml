@@ -24,7 +24,7 @@
 #
 # To pre-fetch model weights instead of paying that cost on the first request,
 # run once from the Render dashboard's Shell tab:
-#   python ../scripts/download_model.py --variant nano
+#   python ../scripts/download_model.py --variant turbo
 
 # NOTE ON SCHEMA: this session has no network access to render.com to
 # validate the blueprint live (see docs/DEPLOYMENT.md for why). The fields
@@ -81,14 +81,14 @@ services:
 
       - key: VOICE_ENGINE
         value: chatterbox
-      # Nano: 110M params, real-time-ish on CPU. Switch to `multilingual` only
-      # once this runs on an instance with several CPU cores and you have
-      # measured the latency with scripts/benchmark.py -- the 0.5B model is
-      # minutes-per-utterance slow on a small CPU instance.
+      # Turbo: 350M params, the smallest/fastest variant chatterbox-tts
+      # 0.1.7 actually provides (a "Nano" checkpoint is not reachable through
+      # this package's public API -- see ai/chatterbox_engine.py). Switch to
+      # `multilingual` only once this runs on an instance with several CPU
+      # cores and you have measured the latency with scripts/benchmark.py --
+      # the 0.5B model is minutes-per-utterance slow on a small CPU instance.
       - key: CHATTERBOX_VARIANT
-        value: nano
-      - key: CHATTERBOX_T3_MODEL
-        value: v3
+        value: turbo
       - key: DEVICE
         value: cpu
       # Loading at boot (rather than on first request) would push Render's

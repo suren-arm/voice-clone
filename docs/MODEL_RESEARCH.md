@@ -10,6 +10,21 @@ Two labels are used throughout:
   model card, package metadata or official README.
 - **Engineering recommendation** — my judgement, given the evidence.
 
+> **Correction, added 12 September 2026.** The original pass below read
+> Chatterbox's claims (including a "Nano" 110M checkpoint) from the
+> `resemble-ai/chatterbox` GitHub repository's documentation. Actually
+> installing `chatterbox-tts==0.1.7` — the latest release on PyPI, and the
+> version this project pins — and inspecting it directly shows no Nano
+> checkpoint is reachable through any public API of that release; `main`
+> branch documentation had moved ahead of what was actually published. This
+> caused a real production bug (`CHATTERBOX_VARIANT=nano` crashed at model
+> load), fixed in `ai/chatterbox_engine.py` by dropping the "nano" option in
+> favour of "turbo" (350M), the smallest variant the installed package
+> genuinely supports. The Nano references below are left as they were
+> originally written, as a record of what was claimed and where the gap was —
+> not because they are correct about what `pip install chatterbox-tts`
+> currently gives you.
+
 ---
 
 ## 1. Candidates surveyed
@@ -128,9 +143,10 @@ The realistic options, and what this project does about them, are written up in
 3. **Breadth without a model swap.** 23 languages from one checkpoint. A
    per-language model zoo would multiply VRAM and deployment complexity.
 4. **A real CPU story.** `device="cpu"` is supported across the family, and
-   Chatterbox-Nano (110M) runs at ~3× real time on 8 CPU cores. Contributors
-   without a GPU can run the whole application, and small deployments do not
-   need to rent one.
+   Chatterbox-Turbo (350M, the smallest variant actually installable via
+   `pip install chatterbox-tts` as of this writing — see the correction
+   below) runs comfortably on CPU. Contributors without a GPU can run the
+   whole application, and small deployments do not need to rent one.
 5. **Watermarking is built in.** Every generation passes through Resemble's
    PerTh watermarker. For a voice-cloning product, provenance is a requirement,
    and getting it in the box beats bolting on something weaker later. It is also

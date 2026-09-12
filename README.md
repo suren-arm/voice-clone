@@ -70,7 +70,8 @@ The short version — the licence decided it:
 
 Chatterbox is the only model at this quality tier whose *weights* are
 permissively licensed. Alongside that: 23 languages from one checkpoint, real
-CPU support (Nano runs ~3× faster than real time on 8 cores), a cacheable
+CPU support (Turbo, the smallest variant this package actually ships,
+runs comfortably in real time on a few cores), a cacheable
 speaker representation, and PerTh watermarking in the box — which
 `tests/ai/` verifies rather than assumes.
 
@@ -135,7 +136,7 @@ python ../scripts/download_model.py         # optional: pre-fetch weights
 uvicorn app.main:app --reload
 ```
 
-On CPU, set `CHATTERBOX_VARIANT=nano` first — the 0.5B multilingual model on CPU
+On CPU, set `CHATTERBOX_VARIANT=turbo` first — the 0.5B multilingual model on CPU
 takes minutes per utterance.
 
 ---
@@ -208,7 +209,7 @@ docker compose up --build
 
 → frontend http://localhost:3000 · API http://localhost:8000
 
-The CPU stack defaults to `CHATTERBOX_VARIANT=nano`. Model weights are **not**
+The CPU stack defaults to `CHATTERBOX_VARIANT=turbo`. Model weights are **not**
 baked into the image — they land in a named `hf-cache` volume, so rebuilding
 does not re-download gigabytes.
 
@@ -242,7 +243,7 @@ pip install -r backend/requirements.txt
 
 Then `DEVICE=cuda` (or leave `DEVICE=auto`, which prefers CUDA → MPS → CPU).
 
-Apple Silicon: `DEVICE=mps`. CPU-only: `DEVICE=cpu` with `CHATTERBOX_VARIANT=nano`.
+Apple Silicon: `DEVICE=mps`. CPU-only: `DEVICE=cpu` with `CHATTERBOX_VARIANT=turbo`.
 
 Hardware recommendations and how to measure RTF on your own machine:
 **[docs/PERFORMANCE.md](docs/PERFORMANCE.md)**.
@@ -256,8 +257,7 @@ Full list with comments in [`.env.example`](.env.example). The ones that matter:
 | Variable | Default | Notes |
 |---|---|---|
 | `VOICE_ENGINE` | `chatterbox` | or `mock` for development and CI |
-| `CHATTERBOX_VARIANT` | `multilingual` | `multilingual` \| `english` \| `turbo` \| `nano` |
-| `CHATTERBOX_T3_MODEL` | `v3` | `v3`, `v2`, or a path to a `.safetensors` fine-tune |
+| `CHATTERBOX_VARIANT` | `multilingual` | `multilingual` \| `english` \| `turbo` (no `nano` -- see below) |
 | `DEVICE` | `auto` | `cuda` \| `cpu` \| `mps` \| `auto` |
 | `PRELOAD_MODEL` | `false` | Load weights at boot instead of on first request |
 | `CORS_ORIGINS` | `http://localhost:3000` | Exact origins. Never `*` |
@@ -430,7 +430,8 @@ scraped audio, or anything designed to remove a watermark.
 | **No streaming** | Chatterbox exposes no incremental API; whole utterances only |
 | **Synchronous generation** | Correct at current RTF; the queue trigger points are written down |
 | **Single GPU** | One worker, one lock. Multi-GPU needs the PostgreSQL + S3 + Redis swap |
-| **CPU is slow for 0.5B** | Use `CHATTERBOX_VARIANT=nano` on CPU |
+| **CPU is slow for 0.5B** | Use `CHATTERBOX_VARIANT=turbo` (350M) on CPU |
+| **No Nano checkpoint** | `chatterbox-tts` 0.1.7 (the pinned PyPI release) has no Nano model reachable through any public API, despite it being documented for the model family generally -- `turbo` (350M) is the smallest variant this package actually provides. See `ai/chatterbox_engine.py`'s module docstring |
 | **ffmpeg strongly recommended** | Without it, only WAV/FLAC/OGG decode |
 | **Rate limiting is per-process** | Wrong with more than one replica |
 | **English-first UI** | The app speaks 23 languages; its own interface does not |
@@ -445,7 +446,7 @@ Full walkthrough: **[docs/DEPLOYMENT.md](docs/DEPLOYMENT.md#cloudflare-pages--re
 
 ```
 Cloudflare Pages                     Render (Docker web service)
-  Next.js static export  ──HTTPS──▶    FastAPI + Chatterbox (CPU, Nano)
+  Next.js static export  ──HTTPS──▶    FastAPI + Chatterbox (CPU, Turbo)
   frontend/out/ · CLOUDFLARE_BUILD=1   render.yaml · backend/Dockerfile.render
 ```
 

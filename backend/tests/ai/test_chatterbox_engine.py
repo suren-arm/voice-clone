@@ -32,7 +32,10 @@ pytestmark = pytest.mark.ai
 
 chatterbox = pytest.importorskip("chatterbox", reason="chatterbox-tts is not installed")
 
-VARIANT = os.environ.get("CHATTERBOX_VARIANT", "nano")
+# "nano" is not a real option -- chatterbox-tts 0.1.7 has no Nano checkpoint
+# reachable through any public API (see ai/chatterbox_engine.py). "turbo"
+# (350M) is the CPU-appropriate variant this package actually provides.
+VARIANT = os.environ.get("CHATTERBOX_VARIANT", "turbo")
 MULTILINGUAL = VARIANT == "multilingual"
 
 
@@ -40,11 +43,7 @@ MULTILINGUAL = VARIANT == "multilingual"
 def engine():
     from ai.chatterbox_engine import ChatterboxEngine
 
-    instance = ChatterboxEngine(
-        variant=VARIANT,
-        device=os.environ.get("DEVICE", "auto"),
-        t3_model=os.environ.get("CHATTERBOX_T3_MODEL", "v3"),
-    )
+    instance = ChatterboxEngine(variant=VARIANT, device=os.environ.get("DEVICE", "auto"))
     instance.load()
     yield instance
     instance.unload()

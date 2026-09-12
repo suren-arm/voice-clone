@@ -12,12 +12,15 @@ from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
-#: Hugging Face repositories holding Chatterbox weights (verified 2026-09-11).
+#: Hugging Face repositories holding Chatterbox weights (verified 2026-09-12
+#: against the installed chatterbox-tts==0.1.7 package's own source, which is
+#: the actual authority here -- see ai/chatterbox_engine.py's module
+#: docstring for why "nano" is deliberately absent from this list: the
+#: currently-pinned package has no code path that loads a Nano checkpoint).
 CHATTERBOX_REPOS: dict[str, str] = {
     "multilingual": "ResembleAI/chatterbox",
     "english": "ResembleAI/chatterbox",
     "turbo": "ResembleAI/chatterbox-turbo",
-    "nano": "ResembleAI/chatterbox-nano",
 }
 
 
