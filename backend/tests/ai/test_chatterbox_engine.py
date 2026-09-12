@@ -35,6 +35,21 @@ chatterbox = pytest.importorskip("chatterbox", reason="chatterbox-tts is not ins
 VARIANT = os.environ.get("CHATTERBOX_VARIANT", "nano")
 MULTILINGUAL = VARIANT == "multilingual"
 
+
+@pytest.fixture(scope="module")
+def engine():
+    from ai.chatterbox_engine import ChatterboxEngine
+
+    instance = ChatterboxEngine(
+        variant=VARIANT,
+        device=os.environ.get("DEVICE", "auto"),
+        t3_model=os.environ.get("CHATTERBOX_T3_MODEL", "v3"),
+    )
+    instance.load()
+    yield instance
+    instance.unload()
+
+
 _ESPEAK_SENTENCES = (
     "The quick brown fox jumps over the lazy dog while the sun sets slowly over the hills.",
     "She sells seashells by the seashore, and the shells she sells are seashells indeed.",
