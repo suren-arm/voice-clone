@@ -1,0 +1,60 @@
+name: Scratch research 3
+
+on:
+  push:
+    branches: [claude/vibrant-keller-svtt3z]
+    paths:
+      - '.github/workflows/_scratch-research3.yml'
+
+jobs:
+  research:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Inspect ArthurYeghinyan/armenian-speecht5-sota
+        run: |
+          echo "=== model card (README) ==="
+          curl -sSL "https://huggingface.co/ArthurYeghinyan/armenian-speecht5-sota/raw/main/README.md" || echo "fetch failed"
+          echo ""
+          echo "=== files in repo ==="
+          curl -sSL "https://huggingface.co/api/models/ArthurYeghinyan/armenian-speecht5-sota" -o /tmp/model.json || true
+          python3 - <<'PYEOF'
+          import json
+          try:
+              data = json.load(open('/tmp/model.json'))
+              print("license tag:", data.get('cardData', {}).get('license'))
+              print("pipeline_tag:", data.get('pipeline_tag'))
+              print("siblings (files):")
+              for f in data.get('siblings', []):
+                  print(' -', f.get('rfilename'))
+              print("gated:", data.get('gated'))
+          except Exception as e:
+              print('parse error', e)
+          PYEOF
+
+      - name: Check for a Chillarmo/GoshKolotyan style community Armenian TTS (not ASR)
+        run: |
+          curl -sSL "https://huggingface.co/api/models?search=armenian+speecht5&limit=20" -o /tmp/s1.json || true
+          python3 - <<'PYEOF'
+          import json
+          try:
+              data = json.load(open('/tmp/s1.json'))
+              for m in data:
+                  print(m.get('id'), m.get('tags'))
+              if not data:
+                  print("(none)")
+          except Exception as e:
+              print('parse error', e)
+          PYEOF
+          echo "--- 'text-to-speech' pipeline_tag filter + armenian ---"
+          curl -sSL "https://huggingface.co/api/models?search=armenian&pipeline_tag=text-to-speech&limit=20" -o /tmp/s2.json || true
+          python3 - <<'PYEOF'
+          import json
+          try:
+              data = json.load(open('/tmp/s2.json'))
+              for m in data:
+                  print(m.get('id'), m.get('tags'), m.get('pipeline_tag'))
+              if not data:
+                  print("(none)")
+          except Exception as e:
+              print('parse error', e)
+          PYEOF
