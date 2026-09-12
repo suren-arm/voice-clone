@@ -112,3 +112,13 @@ services:
         value: "true"
       - key: ENABLE_EXPERIMENTAL_ARMENIAN
         value: "true"
+
+      # Required for "Create Fairy Tale"; every other feature works without
+      # it. A secret, so sync: false -- set the real key in the Render
+      # dashboard's Environment tab, never in this file.
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: STORY_MODEL
+        value: claude-opus-5
+      - key: RATE_LIMIT_STORY_PER_HOUR
+        value: "30"

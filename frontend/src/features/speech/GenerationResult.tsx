@@ -23,6 +23,12 @@ export function GenerationResult({ generation, onGenerateAgain }: GenerationResu
           </Callout>
         )}
 
+        {generation.backgroundNotice && (
+          <Callout kind="info" title="Background sound">
+            {generation.backgroundNotice}
+          </Callout>
+        )}
+
         <AudioPlayer
           src={generationAudioUrl(generation)}
           durationSeconds={generation.durationSeconds}

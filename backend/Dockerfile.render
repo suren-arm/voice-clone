@@ -22,8 +22,10 @@ ENV PYTHONUNBUFFERED=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1 \
     HF_HOME=/cache/huggingface
 
-# ffmpeg decodes what browsers actually record (WebM/Opus, MP4/AAC);
-# libsndfile1 backs soundfile; espeak-ng powers the Armenian G2P diagnostics.
+# ffmpeg decodes what browsers actually record (WebM/Opus, MP4/AAC) and mixes
+# narration with background ambience (ai/audio_mix.py); libsndfile1 backs
+# soundfile; espeak-ng powers the default (non-cloned) voices, English and
+# Armenian alike (ai/espeak_engine.py) -- no longer just a G2P diagnostic.
 RUN apt-get update && apt-get install -y --no-install-recommends \
         ffmpeg \
         libsndfile1 \

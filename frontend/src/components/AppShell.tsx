@@ -6,9 +6,10 @@ import type { ReactNode } from 'react';
 
 const NAV = [
   { href: '/', label: 'Home' },
+  { href: '/generate', label: 'Text to Speech' },
+  { href: '/fairy-tale', label: 'Create Fairy Tale' },
   { href: '/voices/new', label: 'Create Voice' },
   { href: '/voices', label: 'My Voices' },
-  { href: '/generate', label: 'Generate' },
   { href: '/history', label: 'History' },
 ] as const;
 
@@ -26,7 +27,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             <span className="brand__mark" aria-hidden="true">
               ◉
             </span>
-            AI Voice Studio
+            Voice Story Studio
           </Link>
           <nav className="nav" aria-label="Main">
             {NAV.map((item) => (

@@ -78,6 +78,9 @@ const generation: Generation = {
   watermarked: true,
   experimental: false,
   notice: null,
+  backgroundSound: 'none',
+  backgroundApplied: false,
+  backgroundNotice: null,
 };
 
 const fetchMock = vi.fn();
@@ -91,6 +94,7 @@ function jsonResponse(body: unknown) {
 
 function routeTo(url: string) {
   if (url.includes('/system/info')) return jsonResponse(systemInfo);
+  if (url.includes('/voices/defaults')) return jsonResponse([]);
   if (url.includes('/voices')) return jsonResponse({ items: [voice], meta: { total: 1, limit: 100, offset: 0 } });
   if (url.includes('/speech')) return jsonResponse(generation);
   return jsonResponse({});
@@ -114,7 +118,7 @@ describe('GenerateForm', () => {
 
   it('loads voices and languages from the API', async () => {
     renderForm();
-    const voiceSelect = await screen.findByTestId('voice-select');
+    const voiceSelect = await screen.findByTestId('cloned-voice-select');
     expect(voiceSelect).toHaveValue(voice.id);
     expect(screen.getByRole('option', { name: /Armenian \(experimental\) — experimental/ })).toBeInTheDocument();
   });
@@ -157,12 +161,13 @@ describe('GenerateForm', () => {
     expect(screen.getByText('Watermarked')).toBeInTheDocument();
   });
 
-  it('warns when an experimental language is selected', async () => {
+  it('blocks cloned-voice narration for Armenian with a clear explanation', async () => {
     renderForm();
     const languageSelect = await screen.findByTestId('language-select');
     await userEvent.selectOptions(languageSelect, 'hy');
 
-    expect(await screen.findByText(/Experimental language/i)).toBeInTheDocument();
+    expect(await screen.findByText(/does not support Armenian/i)).toBeInTheDocument();
+    expect(screen.getByTestId('generate-submit')).toBeDisabled();
   });
 
   it('surfaces a server error without losing the typed text', async () => {
@@ -189,14 +194,39 @@ describe('GenerateForm', () => {
     expect(screen.queryByTestId('generation-result')).not.toBeInTheDocument();
   });
 
-  it('prompts the user to create a voice when none exist', async () => {
+  it('steers a user with no cloned voices to the default voice instead of blocking them', async () => {
     fetchMock.mockImplementation((input: RequestInfo | URL) => {
       const url = String(input);
       if (url.includes('/system/info')) return Promise.resolve(jsonResponse(systemInfo));
+      if (url.includes('/voices/defaults')) {
+        return Promise.resolve(
+          jsonResponse([{ ...voice, id: 'voice_default000001', source: 'system', name: 'English (Classic)' }]),
+        );
+      }
       return Promise.resolve(jsonResponse({ items: [], meta: { total: 0, limit: 100, offset: 0 } }));
     });
 
     renderForm();
-    await waitFor(() => expect(screen.getByText(/You need a voice first/i)).toBeInTheDocument());
+    await waitFor(() =>
+      expect(screen.getByTestId('voice-source-default')).toHaveAttribute('aria-pressed', 'true'),
+    );
+    expect(await screen.findByTestId('default-voice-select')).toBeInTheDocument();
+  });
+
+  it('still offers a path to create a voice when the user switches back to cloned with none available', async () => {
+    fetchMock.mockImplementation((input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes('/system/info')) return Promise.resolve(jsonResponse(systemInfo));
+      if (url.includes('/voices/defaults')) return Promise.resolve(jsonResponse([]));
+      return Promise.resolve(jsonResponse({ items: [], meta: { total: 0, limit: 100, offset: 0 } }));
+    });
+
+    renderForm();
+    await waitFor(() => expect(screen.getByTestId('voice-source-cloned')).toBeInTheDocument());
+    await userEvent.click(screen.getByTestId('voice-source-cloned'));
+    expect(await screen.findByText(/No cloned voice yet/i)).toBeInTheDocument();
+    // Crucially, the toggle itself must still be there -- switching to
+    // "My Cloned Voice" with none created must not be a dead end.
+    expect(screen.getByTestId('voice-source-default')).toBeInTheDocument();
   });
 });

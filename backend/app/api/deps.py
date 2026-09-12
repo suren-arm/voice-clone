@@ -15,6 +15,7 @@ from app.core.rate_limit import RateLimiter, client_key
 from app.db.session import get_session_factory
 from app.services.speech_service import SpeechService
 from app.services.storage import LocalStorage
+from app.services.story_service import StoryService
 from app.services.voice_service import VoiceService
 
 
@@ -67,8 +68,13 @@ def speech_service(
     return SpeechService(session=session, settings=settings, engine=engine, storage=storage)
 
 
+def story_service(settings: SettingsDep) -> StoryService:
+    return StoryService(settings=settings)
+
+
 VoiceServiceDep = Annotated[VoiceService, Depends(voice_service)]
 SpeechServiceDep = Annotated[SpeechService, Depends(speech_service)]
+StoryServiceDep = Annotated[StoryService, Depends(story_service)]
 
 
 # -- pagination -------------------------------------------------------------
@@ -116,5 +122,13 @@ def limit_speech(request: Request, settings: SettingsDep) -> None:
     if not settings.rate_limit_enabled:
         return
     _limiter("speech requests", settings.rate_limit_speech_per_hour, 3600.0).check(
+        client_key(request)
+    )
+
+
+def limit_story(request: Request, settings: SettingsDep) -> None:
+    if not settings.rate_limit_enabled:
+        return
+    _limiter("story requests", settings.rate_limit_story_per_hour, 3600.0).check(
         client_key(request)
     )

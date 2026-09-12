@@ -45,7 +45,13 @@ _ERRORS = {
 
 
 def _to_response(
-    generation: Generation, prefix: str, notice: str | None = None
+    generation: Generation,
+    prefix: str,
+    notice: str | None = None,
+    *,
+    background_sound: str = "none",
+    background_applied: bool = False,
+    background_notice: str | None = None,
 ) -> GenerationResponse:
     return GenerationResponse(
         id=generation.id,
@@ -63,6 +69,9 @@ def _to_response(
         watermarked=generation.watermarked,
         experimental=generation.experimental,
         notice=notice,
+        background_sound=background_sound,
+        background_applied=background_applied,
+        background_notice=background_notice,
     )
 
 
@@ -86,7 +95,14 @@ async def generate_speech(
     result = await run_in_threadpool(
         speech.generate, payload, voice, profile=profile, actor=client_key(request)
     )
-    return _to_response(result.generation, settings.api_v1_prefix, result.notice)
+    return _to_response(
+        result.generation,
+        settings.api_v1_prefix,
+        result.notice,
+        background_sound=payload.background_sound,
+        background_applied=result.background_applied,
+        background_notice=result.background_notice,
+    )
 
 
 @generations_router.get("", response_model=Page[GenerationResponse], summary="List generated audio")

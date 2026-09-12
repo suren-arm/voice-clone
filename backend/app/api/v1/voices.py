@@ -120,6 +120,20 @@ def list_voices(
 
 
 @router.get(
+    "/defaults",
+    response_model=list[VoiceResponse],
+    summary="List the built-in default (non-cloned) voices",
+)
+def list_default_voices(service: VoiceServiceDep, settings: SettingsDep) -> list[VoiceResponse]:
+    """The fixed default-voice catalog -- distinct from the user's own voices.
+
+    Registered before ``/{voice_id}`` so "defaults" is never swallowed as a
+    voice ID by that route.
+    """
+    return [_to_response(voice, settings.api_v1_prefix) for voice in service.list_default_voices()]
+
+
+@router.get(
     "/{voice_id}", response_model=VoiceResponse, responses=_ERRORS, summary="Get one voice profile"
 )
 def get_voice(voice_id: str, service: VoiceServiceDep, settings: SettingsDep) -> VoiceResponse:

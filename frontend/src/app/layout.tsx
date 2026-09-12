@@ -4,9 +4,9 @@ import { ToastProvider } from '@/hooks/useToast';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'AI Voice Studio',
+  title: 'Voice Story Studio',
   description:
-    'Open-source voice cloning: record a short sample, create a voice profile, and generate speech from text.',
+    'Clone your voice or use a default voice, write text or generate a fairy tale in English or Armenian, and narrate it with optional background ambience.',
   // Voice profiles are personal data; keep the app out of search indexes.
   robots: { index: false, follow: false },
 };
