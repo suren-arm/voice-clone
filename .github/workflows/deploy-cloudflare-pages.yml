@@ -90,28 +90,48 @@ jobs:
         # creating one. Create it via the API on first run so this workflow
         # is a genuine one-shot: no separate manual "create the project in
         # the dashboard" step required before the first deploy succeeds.
+        #
+        # Also captures the project's real `subdomain` as a step output.
+        # This is NOT reliably "<project-name>.pages.dev" -- *.pages.dev is a
+        # namespace shared across every Cloudflare account on the internet,
+        # so if the plain name is already taken by an unrelated project (as
+        # happened here: "ai-voice-studio" was taken, so this project was
+        # assigned "ai-voice-studio-660.pages.dev" instead), Cloudflare
+        # appends a random suffix. Guessing the URL instead of reading it
+        # from the API risks silently verifying (or sending users to) a
+        # stranger's unrelated site.
+        id: ensure_project
         if: steps.preflight.outputs.configured == 'true'
         env:
           CF_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CF_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           CF_PROJECT: ${{ vars.CLOUDFLARE_PAGES_PROJECT || 'ai-voice-studio' }}
         run: |
-          status=$(curl -s -o /dev/null -w '%{http_code}' \
+          response=$(curl -s -w '\n%{http_code}' \
             -H "Authorization: Bearer $CF_API_TOKEN" \
             "https://api.cloudflare.com/client/v4/accounts/$CF_ACCOUNT_ID/pages/projects/$CF_PROJECT")
+          status=$(echo "$response" | tail -n1)
+          body=$(echo "$response" | sed '$d')
           if [ "$status" = "404" ]; then
             echo "Project '$CF_PROJECT' does not exist yet -- creating it."
-            curl -sf -X POST \
+            body=$(curl -sf -X POST \
               -H "Authorization: Bearer $CF_API_TOKEN" \
               -H "Content-Type: application/json" \
               --data "{\"name\":\"$CF_PROJECT\",\"production_branch\":\"main\"}" \
-              "https://api.cloudflare.com/client/v4/accounts/$CF_ACCOUNT_ID/pages/projects"
+              "https://api.cloudflare.com/client/v4/accounts/$CF_ACCOUNT_ID/pages/projects")
           elif [ "$status" != "200" ]; then
             echo "::error::Unexpected response ($status) checking for project '$CF_PROJECT' -- see docs/DEPLOYMENT.md"
             exit 1
           else
             echo "Project '$CF_PROJECT' already exists."
           fi
+          subdomain=$(echo "$body" | grep -o '"subdomain":"[^"]*"' | head -n1 | cut -d'"' -f4)
+          if [ -z "$subdomain" ]; then
+            echo "::error::Could not determine the project's subdomain from the API response"
+            exit 1
+          fi
+          echo "Project subdomain: $subdomain"
+          echo "subdomain=$subdomain" >> "$GITHUB_OUTPUT"
 
       - name: Publish to Cloudflare Pages
         if: steps.preflight.outputs.configured == 'true'
@@ -125,20 +145,32 @@ jobs:
 
       - name: Verify the deployment is actually reachable
         # A "success" from pages-action means Cloudflare accepted the upload,
-        # not that the site serves correctly -- fetch the live production
-        # URL from this runner (which has normal internet access, unlike the
-        # coding sandbox that built this workflow) and fail loudly if it
-        # doesn't come back 200.
+        # not that the site serves correctly, and "<project-name>.pages.dev
+        # returns 200" isn't proof either -- pages.dev is a namespace shared
+        # by every Cloudflare account, so that URL can belong to someone
+        # else's unrelated project entirely (this happened on the very first
+        # real run: "ai-voice-studio.pages.dev" was already a stranger's
+        # site, coincidentally also titled "AI Voice Studio"). So this uses
+        # the actual subdomain the API assigned this project (previous step)
+        # rather than guessing, and checks for "/_next/", a marker specific
+        # to this app's Next.js static export that an unrelated site would
+        # not have, rather than trusting the page title alone.
         if: steps.preflight.outputs.configured == 'true'
         env:
-          CF_PROJECT: ${{ vars.CLOUDFLARE_PAGES_PROJECT || 'ai-voice-studio' }}
+          SUBDOMAIN: ${{ steps.ensure_project.outputs.subdomain }}
         run: |
-          url="https://${CF_PROJECT}.pages.dev/"
+          url="https://${SUBDOMAIN}/"
           status=$(curl -sS -o /tmp/home.html -w '%{http_code}' "$url")
           echo "GET $url -> HTTP $status"
           if [ "$status" != "200" ]; then
             echo "::error::Deployed site at $url did not return 200 (got $status)"
             exit 1
           fi
+          if ! grep -q '/_next/' /tmp/home.html; then
+            echo "::error::$url returned 200 but doesn't look like this app's Next.js build (no /_next/ reference found) -- see response below"
+            cat /tmp/home.html
+            exit 1
+          fi
+          echo "Confirmed: response contains a /_next/ reference, so this is genuinely this app's build."
           echo "--- response snippet ---"
           head -c 500 /tmp/home.html
