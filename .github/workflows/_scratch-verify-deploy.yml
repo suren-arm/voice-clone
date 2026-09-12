@@ -44,8 +44,8 @@ jobs:
       - name: Confirm the Cloudflare production frontend serves the new /fairy-tale route
         if: always()
         run: |
-          url="${{ inputs.frontend_url }}/fairy-tale/"
-          status=$(curl -sS -o /tmp/fairytale.html -w '%{http_code}' -m 20 "$url" || echo "000")
+          url="${{ inputs.frontend_url }}/fairy-tale"
+          status=$(curl -sSL -o /tmp/fairytale.html -w '%{http_code}' -m 20 "$url" || echo "000")
           echo "GET $url -> HTTP $status"
           if [ "$status" != "200" ]; then
             echo "::error::/fairy-tale did not return 200 on the production frontend"
