@@ -5,11 +5,23 @@
 fastapi==0.121.2
 uvicorn[standard]==0.41.0
 python-multipart==0.0.20
-pydantic==2.12.4
+# 2.13.5, not 2.12.4: google-genai (below) requires a newer pydantic-core
+# than 2.12.4 ships -- must match requirements.txt's pin for the same reason.
+pydantic==2.13.5
 pydantic-settings==2.13.1
 SQLAlchemy==2.0.45
 numpy==1.26.4
 soundfile==0.13.1
+
+# app.services.ai_providers/ imports these three vendor SDKs unconditionally
+# at module load (registry.py wires up all four providers regardless of
+# which, if any, API keys are set) -- so even the mock-engine/CI install
+# needs them importable, or `import app.main` fails before a single test
+# runs. They are lightweight pure-Python API clients, not the heavy
+# torch/chatterbox stack this file otherwise exists to avoid.
+anthropic==1.5.0
+openai==3.13.0
+google-genai==2.23.0
 
 pytest==9.0.2
 pytest-cov==7.0.0

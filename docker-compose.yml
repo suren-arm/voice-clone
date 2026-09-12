@@ -33,6 +33,21 @@ services:
       HF_HOME: /cache/huggingface
       MAX_TEXT_CHARS: ${MAX_TEXT_CHARS:-2000}
       ENABLE_EXPERIMENTAL_ARMENIAN: ${ENABLE_EXPERIMENTAL_ARMENIAN:-true}
+      # Fairy-tale generation (see README.md's "AI Providers" section): none
+      # of these is required, "Create Fairy Tale" works with any subset
+      # configured. Compose only forwards variables listed here -- an unset
+      # host variable becomes an empty string in the container, which
+      # Settings treats the same as "not configured".
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_MODEL: ${OPENAI_MODEL:-gpt-5.5}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      GEMINI_MODEL: ${GEMINI_MODEL:-gemini-3.5-flash}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      ANTHROPIC_MODEL: ${ANTHROPIC_MODEL:-claude-opus-5}
+      OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-}
+      OLLAMA_MODEL: ${OLLAMA_MODEL:-qwen2.5:7b}
+      AI_PREFERRED_PROVIDER: ${AI_PREFERRED_PROVIDER:-}
+      AI_AUTO_PREFER_FREE: ${AI_AUTO_PREFER_FREE:-false}
     volumes:
       # Persist user data and downloaded weights across rebuilds.
       - ./storage:/app/storage

@@ -57,6 +57,14 @@ Browser ──HTTPS──▶ FastAPI ──┬─ speech ─┤
 - [Voice-cloning safety](#voice-cloning-safety)
 - [Known limitations](#known-limitations)
 - [Deployment](#deployment)
+  - [Cloudflare vs Render at a glance](#cloudflare-vs-render-at-a-glance)
+  - [Cloudflare (frontend)](#cloudflare-frontend)
+  - [Render (backend)](#render-backend)
+  - [Why both are needed](#why-both-are-needed)
+  - [Deploying the frontend to Cloudflare](#deploying-the-frontend-to-cloudflare)
+  - [Deploying the backend to Render](#deploying-the-backend-to-render)
+  - [Deployment verification](#deployment-verification)
+  - [Deployment troubleshooting](#deployment-troubleshooting)
 - [Roadmap](#roadmap)
 
 ---
@@ -358,7 +366,11 @@ docker compose up --build
 
 The CPU stack defaults to `CHATTERBOX_VARIANT=turbo`. Model weights are **not**
 baked into the image — they land in a named `hf-cache` volume, so rebuilding
-does not re-download gigabytes.
+does not re-download gigabytes. `docker-compose.yml` forwards every
+[provider-specific](#provider-specific-ai-text-generation) variable from your
+shell/`.env` into the `api` container, so setting e.g. `GEMINI_API_KEY` in
+`.env` before `docker compose up` is enough to make "Create Fairy Tale" work
+the same way it does under plain `uvicorn`.
 
 ### GPU
 
@@ -399,7 +411,26 @@ Hardware recommendations and how to measure RTF on your own machine:
 
 ## Configuration
 
-Full list with comments in [`.env.example`](.env.example). The ones that matter:
+Full list with comments in [`.env.example`](.env.example) (backend + Docker
+Compose) and [`frontend/.env.example`](frontend/.env.example) (frontend).
+Every variable below is read by real code — nothing here is aspirational —
+see [`backend/app/core/config.py`](backend/app/core/config.py) for the
+backend's `Settings` class and
+[`frontend/src/services/apiClient.ts`](frontend/src/services/apiClient.ts)
+for the one frontend variable.
+
+### Required
+
+| Variable | Where | Default | Notes |
+|---|---|---|---|
+| `NEXT_PUBLIC_API_URL` | Frontend (build-time) | `http://localhost:8000` | The only thing that tells the frontend where the API is. Baked into the static bundle — changing it needs a rebuild, not a restart |
+
+Nothing on the **backend** is strictly required to boot — every variable has a
+working default for local development. In production, set `CORS_ORIGINS` (see
+[Deployment-only](#deployment-only) below) or the frontend simply cannot call
+the API from a browser.
+
+### Optional (backend core)
 
 | Variable | Default | Notes |
 |---|---|---|
@@ -407,20 +438,41 @@ Full list with comments in [`.env.example`](.env.example). The ones that matter:
 | `CHATTERBOX_VARIANT` | `multilingual` | `multilingual` \| `english` \| `turbo` (no `nano` -- see below) |
 | `DEVICE` | `auto` | `cuda` \| `cpu` \| `mps` \| `auto` |
 | `PRELOAD_MODEL` | `false` | Load weights at boot instead of on first request |
-| `CORS_ORIGINS` | `http://localhost:3000` | Exact origins. Never `*` |
 | `MAX_UPLOAD_BYTES` | 25 MiB | |
 | `MAX_TEXT_CHARS` | 2000 | Caps worst-case request latency |
 | `REQUIRE_CONSENT` | `true` | Do not disable in production |
 | `RATE_LIMIT_ENABLED` | `true` | |
 | `ENABLE_EXPERIMENTAL_ARMENIAN` | `true` | API-only; the UI never exposes cloned+Armenian regardless |
 | `DATABASE_URL` | `sqlite:///storage/voice_studio.db` | Any SQLAlchemy URL |
-| `OPENAI_API_KEY` / `OPENAI_MODEL` | unset / `gpt-5.5` | See [AI Providers](#ai-providers) |
-| `GEMINI_API_KEY` / `GEMINI_MODEL` | unset / `gemini-3.5-flash` | Free tier, no billing account needed |
-| `ANTHROPIC_API_KEY` / `ANTHROPIC_MODEL` | unset / `claude-opus-5` | Optional, not mandatory |
-| `OLLAMA_BASE_URL` / `OLLAMA_MODEL` | unset / `qwen2.5:7b` | Self-hosted; the no-vendor-cost option |
+| `STORAGE_DIR` | `storage` | Recordings, generated audio, the SQLite file |
+
+### Provider-specific (AI text generation)
+
+**At least one of the four is required for "Create Fairy Tale" to work.**
+Every other feature (recording, cloning, Text to Speech, playback, download,
+background ambience) works with all four unset. Full explanation:
+[AI Providers](#ai-providers).
+
+| Variable | Default | Notes |
+|---|---|---|
+| `OPENAI_API_KEY` / `OPENAI_MODEL` | unset / `gpt-5.5` | Paid, needs billing enabled |
+| `GEMINI_API_KEY` / `GEMINI_MODEL` | unset / `gemini-3.5-flash` | Free tier, no billing account needed — cheapest way to try this feature |
+| `ANTHROPIC_API_KEY` / `ANTHROPIC_MODEL` | unset / `claude-opus-5` | Paid |
+| `OLLAMA_BASE_URL` / `OLLAMA_MODEL` | unset / `qwen2.5:7b` | Self-hosted; the no-vendor-cost option — see [Why Ollama](#why-ollama-for-the-freelocal-option) |
 | `AI_PREFERRED_PROVIDER` | unset | "auto" mode tries this provider first if configured |
 | `AI_AUTO_PREFER_FREE` | `false` | "auto" mode tries free-tier/local providers before paid ones |
 | `RATE_LIMIT_STORY_PER_HOUR` | `30` | |
+
+### Deployment-only
+
+Set these on the **host** (Render's Environment tab, or your own server) —
+they either have no sensible default for local development or are secrets
+that must never be committed:
+
+| Variable | Local default | Notes |
+|---|---|---|
+| `CORS_ORIGINS` | `http://localhost:3000,http://127.0.0.1:3000` | **Must** list the frontend's exact production origin, comma-separated, no trailing slash, never `*` |
+| `ENVIRONMENT` | `development` | `production` switches logging to structured JSON |
 
 None of the four AI provider variables is individually required — "Create
 Fairy Tale" works with any subset configured (including zero, where it
@@ -619,41 +671,279 @@ scraped audio, or anything designed to remove a watermark.
 ## Deployment
 
 **Shipped and ready to run:** Cloudflare Pages (frontend) + Render (backend).
-Full walkthrough: **[docs/DEPLOYMENT.md](docs/DEPLOYMENT.md#cloudflare-pages--render-the-shipped-config)**
+Full step-by-step walkthrough (dashboard clicks, exact field values, GitHub
+Actions alternative): **[docs/DEPLOYMENT.md](docs/DEPLOYMENT.md#cloudflare-pages--render-the-shipped-config)**.
+What follows here is the part every developer actually needs: what each
+platform is responsible for, why both exist, and how to verify it worked.
 
 ```
-Cloudflare Pages                     Render (Docker web service)
-  Next.js static export  ──HTTPS──▶    FastAPI + Chatterbox (CPU, Turbo)
-  frontend/out/ · CLOUDFLARE_BUILD=1   render.yaml · backend/Dockerfile.render
+Browser
+   │  HTML/CSS/JS (static)          HTTPS API calls (fetch)
+   ▼                                        │
+Cloudflare Pages                            ▼
+  Next.js static export ─────────▶  Render Web Service (Docker)
+  frontend/out/                       FastAPI + Chatterbox (CPU, Turbo)
+  CLOUDFLARE_BUILD=1                  backend/Dockerfile.render · render.yaml
+                                       │
+                                       ├── AI Story Generation (StoryService)
+                                       │     ├── OpenAI        (optional)
+                                       │     ├── Google Gemini (optional, free tier)
+                                       │     ├── Anthropic     (optional)
+                                       │     └── Ollama        (optional, self-hosted)
+                                       │
+                                       ├── Voice cloning (Chatterbox, PyTorch/CPU)
+                                       ├── Default-voice TTS (espeak-ng, en + hy)
+                                       ├── Audio mixing (ffmpeg: narration + ambience)
+                                       └── SQLite + /app/storage (persistent disk)
 ```
 
-Cloudflare Workers has no PyTorch runtime, so the backend needs an ordinary
-container host regardless of which Cloudflare product serves the frontend —
-Render was chosen because it builds a plain Dockerfile with a persistent disk
-for `storage/` and the model cache, no separate volume product required. The
-frontend needs no Workers runtime adapter either: every route is already a
-static, client-rendered page, so `next build` with `CLOUDFLARE_BUILD=1`
-produces a plain static export Cloudflare Pages serves directly.
+The browser talks **directly** to Render over HTTPS — Cloudflare Pages is a
+static file host here, not a reverse proxy in front of the API. There is no
+request path that goes browser → Cloudflare → Render; it is two independent
+HTTPS endpoints the frontend bundle happens to know about.
 
-Three things to get right, wherever you deploy: `NEXT_PUBLIC_API_URL` is
-compiled into the frontend bundle at build time (changing it needs a rebuild),
-`CORS_ORIGINS` on the backend must list the frontend's exact origin, set
-*after* the frontend's first deploy since that's when the URL is assigned, and
-**at least one** of `OPENAI_API_KEY` / `GEMINI_API_KEY` / `ANTHROPIC_API_KEY` /
-`OLLAMA_BASE_URL` must be set on the backend host (Render environment
-variables, not build-time/frontend values) for "Create Fairy Tale" to
-actually generate a story — every other feature works without any of them.
-Gemini's free tier (see [AI Providers](#ai-providers)) is the cheapest way to
-get that one working: a Google AI Studio key, free, no card required.
-**HTTPS is mandatory** — `getUserMedia` refuses to run outside a secure
-context, so microphone recording simply will not work over plain HTTP. Both
-platforms provide HTTPS by default on their `*.pages.dev` / `*.onrender.com`
-domains, so this needs no extra configuration.
+### Cloudflare vs Render at a glance
 
-Other hosting options (GPU providers for the multilingual model, Vercel/Netlify
-for the frontend, self-hosting both on one box) are still fully documented in
-[docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) — the Cloudflare/Render path above is
-the one this repository ships pre-configured for, not the only one that works.
+| Component | Hosted on | Responsibility |
+|---|---|---|
+| Frontend (Next.js UI) | **Cloudflare Pages** | Static HTML/JS/CSS, global CDN, HTTPS, the domain the user visits |
+| Backend API | **Render** (Docker web service) | FastAPI, voice cloning (Chatterbox/PyTorch), default-voice TTS (espeak-ng), audio mixing (ffmpeg), SQLite + file storage |
+| OpenAI / Gemini / Anthropic | **External API** (called from the backend only) | Fairy-tale story text generation |
+| Ollama | **Your own server** (optional, self-hosted) | Free/local alternative story generation |
+| Voice cloning model (Chatterbox) | **Render** (bundled in the backend image) | Zero-shot speech synthesis |
+
+**Why both are needed:** Cloudflare Workers/Pages has no PyTorch runtime, so
+it is architecturally unable to run this backend at all — that alone forces a
+second host for anything that loads Chatterbox. Render was picked for that
+half because it builds a plain Dockerfile, needs no platform-specific
+rewrite, and bundles a persistent disk for `storage/` + the model cache into
+the same service (no separate volume product to wire up). Cloudflare Pages
+remains the right choice for the *frontend* half on its own merits — this app
+needs no Workers runtime adapter, since every route is already a static,
+client-rendered page (verified by `grep` across `frontend/src`, not assumed):
+`next build` with `CLOUDFLARE_BUILD=1` (see `frontend/next.config.ts`)
+produces a plain static export that Cloudflare's global CDN serves with free
+HTTPS on a `*.pages.dev` subdomain (or your own custom domain).
+
+### Cloudflare (frontend)
+
+- **What's hosted:** the compiled static export of the Next.js app —
+  plain HTML/CSS/JS, no Node server, no Workers runtime.
+- **Cloudflare product:** **Pages**, not Workers. (Workers is used nowhere in
+  this app — mentioned only to be explicit, since both are "Workers & Pages"
+  in Cloudflare's current dashboard.)
+- **Why Cloudflare specifically:** free static hosting with a global CDN,
+  automatic HTTPS (microphone capture requires a secure context — plain HTTP
+  will not work), and a Git-integration deploy that needs zero servers of its
+  own to maintain.
+- **Build command:** `CLOUDFLARE_BUILD=1 npm run build` (from `frontend/`) —
+  the env var flips `next.config.ts` to `output: 'export'`. A plain
+  `npm run build` (no `CLOUDFLARE_BUILD`) produces a Node server build
+  instead, which Cloudflare Pages cannot serve.
+- **Deployed directory:** `frontend/out/` (verified: contains `index.html`,
+  per-route `.html` files, `_next/`, and the security-header `_headers` file
+  copied in from `frontend/public/_headers`).
+- **How it reaches the backend:** `NEXT_PUBLIC_API_URL`, set as a Cloudflare
+  Pages **build-time** environment variable, is compiled directly into the
+  static JS bundle (see `frontend/src/services/apiClient.ts`) — the browser
+  calls that URL over plain HTTPS with no proxying through Cloudflare.
+- **How it's deployed:** either Cloudflare's own Git integration (dashboard →
+  connect repo → auto-builds on every push to the production branch), or the
+  included `.github/workflows/deploy-cloudflare-pages.yml` — use one or the
+  other, not both (see [Deploying the frontend](#deploying-the-frontend-to-cloudflare)).
+
+### Render (backend)
+
+- **What's hosted:** the full Python/FastAPI backend — API routes, the
+  Chatterbox voice-cloning engine (PyTorch, CPU), espeak-ng default-voice
+  synthesis, ffmpeg audio mixing, SQLite, and the file storage tree.
+- **Service type:** Render **Web Service**, `runtime: docker`, defined as
+  code in [`render.yaml`](render.yaml) (a Render "Blueprint").
+- **Repository / root:** this repository; Docker build context is the repo
+  root (`.`) because the image needs both `backend/` and the sibling `ai/`
+  package.
+- **Build:** `docker build -f backend/Dockerfile.render .` — a single-stage
+  CPU image (Python 3.11-slim + ffmpeg + libsndfile1 + espeak-ng + the CPU
+  build of torch).
+- **Start command:** baked into the image, not set separately in the
+  dashboard — `uvicorn app.main:app --host 0.0.0.0 --port ${PORT} --workers 1`
+  (one worker: the model is loaded per process, so a second worker would
+  double memory for no throughput gain on a single CPU instance).
+- **Plan / region:** `starter` / `oregon` in the shipped Blueprint — the free
+  plan's 512 MB RAM is too tight for PyTorch + a loaded model, and free
+  services spin down on idle.
+- **Health check:** `GET /health` (`healthCheckPath` in `render.yaml`) →
+  `{"status": "ok", "engineLoaded": false, "version": "0.1.0"}` — the
+  liveness probe Render polls to know the deploy succeeded.
+- **Persistent disk:** 5 GB mounted at `/app/storage` — survives redeploys,
+  so user voices and the SQLite database are not wiped on every push.
+- **Public URL:** assigned by Render on first deploy, shown in its dashboard —
+  typically `https://voice-clone-api.onrender.com`, or
+  `https://voice-clone-api-<random>.onrender.com` if that exact name is
+  already taken by another Render account.
+- **Environment variables:** set in the Render dashboard → the service →
+  **Environment** tab (see [Render environment variables](#render-environment-variables)
+  below) — never in `render.yaml` for anything secret, since that file is
+  committed to git (`sync: false` in the Blueprint marks exactly which
+  variables must be set by hand, per-deployment, instead).
+
+#### Render environment variables
+
+Render Dashboard → your Web Service → **Environment**. Set whichever of these
+apply — see [Configuration](#configuration) for defaults and what each does:
+
+```
+CORS_ORIGINS          (required in production — the Cloudflare Pages origin)
+OPENAI_API_KEY        (optional — at least one AI provider needed for Fairy Tale)
+GEMINI_API_KEY        (optional — free tier, no billing account needed)
+ANTHROPIC_API_KEY     (optional)
+OLLAMA_BASE_URL       (optional — only if you run your own Ollama server)
+```
+
+Never put values in this README, in `render.yaml`, or in any committed file —
+only variable *names* belong in version control.
+
+### Why both are needed
+
+Restating it plainly, since it's the one thing every new contributor asks:
+Cloudflare **cannot** run this backend — Workers has no PyTorch runtime, full
+stop — so a second, ordinary container host is not optional, it is the only
+way this app's voice cloning works at all. Render is that host. Once a real
+container host exists anyway, there is no reason to *also* run the frontend
+there: Cloudflare Pages is free, faster (CDN-distributed static files beat a
+Node server for a client-rendered app), and needs no server process to keep
+alive. Two platforms, two genuinely different jobs — not redundancy.
+
+### Secrets belong on the backend, never in the frontend
+
+**Never** put an OpenAI, Gemini, Anthropic, or any other private API key
+inside the frontend build or browser JavaScript — anything prefixed
+`NEXT_PUBLIC_` (the *only* frontend variable this app has is
+`NEXT_PUBLIC_API_URL`) ends up readable in plain text by anyone who opens
+DevTools, because it is compiled directly into the static bundle Cloudflare
+serves to every visitor.
+
+```
+Correct:    Browser ──▶ Backend (Render) ──▶ AI provider   (key stays server-side)
+Never:      Browser ──▶ AI provider directly, using a key embedded in the JS bundle
+```
+
+Every AI provider key in this app already lives only in
+`backend/app/core/config.py`'s `Settings`, read from the Render environment —
+the frontend never sees them, not even indirectly (`GET /api/v1/ai/providers`
+reports only id/name/kind/availability booleans, never a key value — see
+[AI Providers](#ai-providers)).
+
+### Deploying the frontend to Cloudflare
+
+**Option A — Cloudflare's own Git integration (simplest):**
+
+1. [dash.cloudflare.com](https://dash.cloudflare.com) → **Workers & Pages** →
+   **Create** → **Pages** → **Connect to Git** → select this repository.
+2. Build settings:
+
+   | Field | Value |
+   |---|---|
+   | Build command | `CLOUDFLARE_BUILD=1 npm run build` |
+   | Build output directory | `frontend/out` |
+   | Root directory | `frontend` |
+3. **Settings → Environment variables** (Production environment):
+   `NEXT_PUBLIC_API_URL` = your Render backend's URL.
+4. Deploy. Every subsequent push to the production branch (Cloudflare's own
+   Git integration, not the GitHub Actions workflow) redeploys automatically.
+
+**Option B — the included GitHub Actions workflow**
+(`.github/workflows/deploy-cloudflare-pages.yml`): builds and publishes via
+`cloudflare/pages-action` on every push, driven from CI instead of
+Cloudflare's dashboard integration. Needs `CLOUDFLARE_API_TOKEN` and
+`CLOUDFLARE_ACCOUNT_ID` as repository secrets, and `NEXT_PUBLIC_API_URL` as a
+repository variable — see the comment block at the top of that workflow file
+for the exact one-time setup. **Use one option or the other, not both** — running
+both against the same Pages project makes them race each other on every push.
+
+Full walkthrough with exact dashboard screenshots-in-words:
+[docs/DEPLOYMENT.md](docs/DEPLOYMENT.md#cloudflare-pages--render-the-shipped-config).
+
+### Deploying the backend to Render
+
+1. [dashboard.render.com](https://dashboard.render.com) → **New** →
+   **Blueprint** → connect this GitHub repository.
+2. Render reads [`render.yaml`](render.yaml) and proposes one service,
+   `voice-clone-api`. Accept it — every build/start/health-check setting is
+   already defined in that file, nothing to fill in by hand.
+3. It will fail its first health check with no `CORS_ORIGINS` set yet —
+   expected; that value only exists once the frontend has its own URL (step 3
+   below).
+4. Once deployed, copy the assigned URL from the Render dashboard.
+5. Set the AI provider key(s) you want under **Environment** (see
+   [Render environment variables](#render-environment-variables) above) — at
+   least one is required for "Create Fairy Tale" to work.
+6. After deploying the frontend (previous section), come back here and set
+   `CORS_ORIGINS` to the frontend's exact origin — Render redeploys
+   automatically on save.
+
+Full walkthrough: [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md#cloudflare-pages--render-the-shipped-config).
+Other backend hosting options (GPU providers, Hugging Face Spaces, a single
+self-hosted box) are documented there too — the Render path above is what
+this repository ships pre-configured for, not the only one that works.
+
+### Deployment verification
+
+After deploying both halves, work through this list against the **live**
+URLs (not localhost):
+
+- [ ] `GET https://<your-render-url>/health` returns `{"status": "ok", ...}`
+- [ ] The Cloudflare Pages URL loads the home page
+- [ ] Opening the frontend with DevTools open shows `GET /api/v1/system/info`
+      succeeding with **no CORS error** in the console
+- [ ] Text to Speech works with a **default voice** (English)
+- [ ] Text to Speech works with a **default voice** (Armenian)
+- [ ] Voice cloning: record/upload → create a voice → narrate with it
+- [ ] `GET /api/v1/ai/providers` shows **at least one** provider `available: true`
+- [ ] **Create Fairy Tale** actually generates a story (not a 503)
+- [ ] Background ambience ("Mystical") audibly mixes under narration
+- [ ] Generated audio plays back in the browser
+- [ ] Generated audio downloads correctly
+
+### Deployment troubleshooting
+
+**Old UI is still displayed after a deploy**
+Check: you pushed to the branch Cloudflare Pages' *production* branch is set
+to (its `production_branch`, set once at project creation — a mismatch here
+makes Cloudflare treat the deploy as a non-production *preview*, so the live
+URL never updates); the Cloudflare Pages build actually succeeded (dashboard
+→ your project → Deployments); the build output directory is `frontend/out`,
+not `.next` or `out/` from the wrong working directory; and finally your own
+browser/CDN cache (hard-refresh) before assuming the deploy itself is stale.
+
+**"Create Fairy Tale" says the provider is not configured**
+Check `GET /api/v1/ai/providers` on your **backend** URL directly — it lists
+every provider with an `available` boolean, never a key. If all four are
+`false`, no `*_API_KEY` / `OLLAMA_BASE_URL` is set on Render; set one under
+**Environment** and Render will redeploy automatically. This error is
+expected and correct, not a bug, until at least one is set.
+
+**Frontend loads but every API call fails**
+Almost always CORS or a stale backend URL, not a backend outage:
+- Open DevTools → Network tab. A CORS error in the console (not a 4xx/5xx
+  status) means `CORS_ORIGINS` on Render doesn't exactly match the frontend's
+  origin (scheme + host, no trailing slash, no path).
+- `net::ERR_NAME_NOT_RESOLVED` or similar means `NEXT_PUBLIC_API_URL` was
+  wrong **at the time the frontend was built** — fix it and redeploy the
+  frontend, since it cannot be changed at runtime.
+- Confirm the Render service itself is live: `curl https://<render-url>/health`.
+
+**Local backend works but production fails**
+Check, in order: Render's **Logs** tab for the actual exception (far more
+informative than a generic 500 in the browser); that every environment
+variable you rely on locally is also set on Render (a local `.env` is never
+uploaded — Render only sees the dashboard's **Environment** tab); that the
+build actually installed everything (`backend/requirements.txt`, not
+`requirements-ci.txt`, is what `Dockerfile.render` installs — the CI-only
+file deliberately omits the heavy `torch`/`chatterbox-tts` stack); and that
+ffmpeg/espeak-ng are present (they are baked into `backend/Dockerfile.render`
+already — if a custom Docker change removed them, narration and background
+mixing break silently for real audio while the mock engine still passes).
 
 ---
 
