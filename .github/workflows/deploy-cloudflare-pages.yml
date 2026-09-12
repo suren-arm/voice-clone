@@ -38,6 +38,14 @@ jobs:
   deploy:
     name: Build and deploy
     runs-on: ubuntu-latest
+    # cloudflare/pages-action creates a GitHub Deployment record via the API
+    # using GITHUB_TOKEN -- the default token this workflow gets is read-only
+    # unless granted deployments:write here, and without it the publish step
+    # fails with "Resource not accessible by integration" (403) after the
+    # Cloudflare side has already succeeded.
+    permissions:
+      contents: read
+      deployments: write
     defaults:
       run:
         working-directory: frontend
