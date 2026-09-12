@@ -122,3 +122,23 @@ jobs:
           projectName: ${{ vars.CLOUDFLARE_PAGES_PROJECT || 'ai-voice-studio' }}
           directory: frontend/out
           gitHubToken: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Verify the deployment is actually reachable
+        # A "success" from pages-action means Cloudflare accepted the upload,
+        # not that the site serves correctly -- fetch the live production
+        # URL from this runner (which has normal internet access, unlike the
+        # coding sandbox that built this workflow) and fail loudly if it
+        # doesn't come back 200.
+        if: steps.preflight.outputs.configured == 'true'
+        env:
+          CF_PROJECT: ${{ vars.CLOUDFLARE_PAGES_PROJECT || 'ai-voice-studio' }}
+        run: |
+          url="https://${CF_PROJECT}.pages.dev/"
+          status=$(curl -sS -o /tmp/home.html -w '%{http_code}' "$url")
+          echo "GET $url -> HTTP $status"
+          if [ "$status" != "200" ]; then
+            echo "::error::Deployed site at $url did not return 200 (got $status)"
+            exit 1
+          fi
+          echo "--- response snippet ---"
+          head -c 500 /tmp/home.html
