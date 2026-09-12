@@ -76,6 +76,35 @@ jobs:
           # deploy cannot talk to any real backend -- set this for real.
           NEXT_PUBLIC_API_URL: ${{ vars.NEXT_PUBLIC_API_URL || 'https://voice-clone-api.onrender.com' }}
 
+      - name: Ensure the Cloudflare Pages project exists
+        # cloudflare/pages-action can only deploy to a project that already
+        # exists -- it returns "Project not found" (8000007) rather than
+        # creating one. Create it via the API on first run so this workflow
+        # is a genuine one-shot: no separate manual "create the project in
+        # the dashboard" step required before the first deploy succeeds.
+        if: steps.preflight.outputs.configured == 'true'
+        env:
+          CF_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CF_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CF_PROJECT: ${{ vars.CLOUDFLARE_PAGES_PROJECT || 'ai-voice-studio' }}
+        run: |
+          status=$(curl -s -o /dev/null -w '%{http_code}' \
+            -H "Authorization: Bearer $CF_API_TOKEN" \
+            "https://api.cloudflare.com/client/v4/accounts/$CF_ACCOUNT_ID/pages/projects/$CF_PROJECT")
+          if [ "$status" = "404" ]; then
+            echo "Project '$CF_PROJECT' does not exist yet -- creating it."
+            curl -sf -X POST \
+              -H "Authorization: Bearer $CF_API_TOKEN" \
+              -H "Content-Type: application/json" \
+              --data "{\"name\":\"$CF_PROJECT\",\"production_branch\":\"main\"}" \
+              "https://api.cloudflare.com/client/v4/accounts/$CF_ACCOUNT_ID/pages/projects"
+          elif [ "$status" != "200" ]; then
+            echo "::error::Unexpected response ($status) checking for project '$CF_PROJECT' -- see docs/DEPLOYMENT.md"
+            exit 1
+          else
+            echo "Project '$CF_PROJECT' already exists."
+          fi
+
       - name: Publish to Cloudflare Pages
         if: steps.preflight.outputs.configured == 'true'
         uses: cloudflare/pages-action@v1
