@@ -60,6 +60,12 @@ class GeminiProvider(AiTextProvider):
                 config=genai_types.GenerateContentConfig(
                     system_instruction=prompt.system,
                     max_output_tokens=prompt.max_tokens,
+                    # Gemini's "thinking" models spend part of max_output_tokens on
+                    # internal reasoning before any visible text -- fine for math/code,
+                    # but for a fairy tale it was silently eating the whole budget and
+                    # truncating output to a few words (worse for Armenian, which costs
+                    # more tokens per word). No reasoning is needed here, so disable it.
+                    thinking_config=genai_types.ThinkingConfig(thinking_budget=0),
                     http_options=genai_types.HttpOptions(timeout=_REQUEST_TIMEOUT_MS),
                 ),
             )

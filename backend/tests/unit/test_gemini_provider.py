@@ -62,6 +62,9 @@ def test_generates_and_returns_text(monkeypatch):
     assert "fox and a rabbit" in text
     assert models.last_kwargs["model"] == "gemini-3.5-flash"
     assert models.last_kwargs["config"].system_instruction == "You are a storyteller."
+    # Thinking must be disabled: it otherwise eats max_output_tokens on internal
+    # reasoning before any visible text, truncating (or emptying) the story.
+    assert models.last_kwargs["config"].thinking_config.thinking_budget == 0
 
 
 def test_empty_response_raises(monkeypatch):
