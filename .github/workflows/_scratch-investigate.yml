@@ -1,0 +1,24 @@
+name: Scratch investigate 2
+
+on:
+  workflow_dispatch:
+
+jobs:
+  investigate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fetch the live page and every JS chunk it references, grep for the API URL
+        run: |
+          base="https://ai-voice-studio-660.pages.dev"
+          curl -sS "$base/voices/new" -o /tmp/page.html
+          echo "=== page.html size ==="
+          wc -c /tmp/page.html
+          echo "=== script src references ==="
+          grep -oE '/_next/static/[a-zA-Z0-9/_.-]+\.js' /tmp/page.html | sort -u > /tmp/chunks.txt
+          cat /tmp/chunks.txt
+          echo "=== downloading each chunk and grepping for onrender.com URLs ==="
+          while read -r chunk; do
+            echo "--- $chunk ---"
+            curl -sS "$base$chunk" -o /tmp/chunk.js
+            grep -o 'https://voice-clone[a-zA-Z0-9.-]*\.onrender\.com' /tmp/chunk.js | sort -u || echo "  (no onrender.com match)"
+          done < /tmp/chunks.txt
