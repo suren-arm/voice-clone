@@ -17,17 +17,17 @@ jobs:
           curl -sSL "https://huggingface.co/rhasspy/piper-voices/raw/main/voices.json" -o /tmp/voices.json || echo "fetch failed"
           wc -c /tmp/voices.json || true
           echo "--- languages present (family codes) ---"
-          python3 -c "
-import json
-try:
-    data = json.load(open('/tmp/voices.json'))
-    langs = sorted(set(v['language']['code'] for v in data.values()))
-    print(langs)
-    hy = [k for k,v in data.items() if v['language']['code'].startswith('hy')]
-    print('Armenian entries:', hy)
-except Exception as e:
-    print('parse error', e)
-" || true
+          python3 - <<'PYEOF'
+          import json
+          try:
+              data = json.load(open('/tmp/voices.json'))
+              langs = sorted(set(v['language']['code'] for v in data.values()))
+              print(langs)
+              hy = [k for k, v in data.items() if v['language']['code'].startswith('hy')]
+              print('Armenian entries:', hy)
+          except Exception as e:
+              print('parse error', e)
+          PYEOF
 
       - name: Check facebook/mms-tts-hye license and files
         run: |
@@ -37,23 +37,23 @@ except Exception as e:
       - name: Check for any other Armenian open TTS on HF (search API)
         run: |
           curl -sSL "https://huggingface.co/api/models?search=armenian%20tts&limit=20" -o /tmp/search1.json || true
-          python3 -c "
-import json
-try:
-    data = json.load(open('/tmp/search1.json'))
-    for m in data:
-        print(m.get('id'), m.get('tags'))
-except Exception as e:
-    print('parse error', e)
-" || true
+          python3 - <<'PYEOF'
+          import json
+          try:
+              data = json.load(open('/tmp/search1.json'))
+              for m in data:
+                  print(m.get('id'), m.get('tags'))
+          except Exception as e:
+              print('parse error', e)
+          PYEOF
           echo "--- search 'hy tts' ---"
           curl -sSL "https://huggingface.co/api/models?search=hy%20tts&limit=20" -o /tmp/search2.json || true
-          python3 -c "
-import json
-try:
-    data = json.load(open('/tmp/search2.json'))
-    for m in data:
-        print(m.get('id'), m.get('tags'))
-except Exception as e:
-    print('parse error', e)
-" || true
+          python3 - <<'PYEOF'
+          import json
+          try:
+              data = json.load(open('/tmp/search2.json'))
+              for m in data:
+                  print(m.get('id'), m.get('tags'))
+          except Exception as e:
+              print('parse error', e)
+          PYEOF
