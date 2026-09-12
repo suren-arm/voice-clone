@@ -1,0 +1,35 @@
+name: Scratch check Gemini configured 2
+
+on:
+  workflow_dispatch:
+    inputs:
+      url:
+        description: Backend base URL to check
+        type: string
+        default: https://voice-clone-2nhg.onrender.com
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check GET /api/v1/ai/providers for gemini availability
+        run: |
+          url="${{ inputs.url }}/api/v1/ai/providers"
+          status=$(curl -sS -o /tmp/body.json -w '%{http_code}' -m 20 "$url" || echo "000")
+          echo "GET $url -> HTTP $status"
+          cat /tmp/body.json
+          echo ""
+          if [ "$status" != "200" ]; then
+            echo "::error::Could not reach the providers endpoint"
+            exit 1
+          fi
+          python3 - <<'PYEOF'
+          import json
+          data = json.load(open('/tmp/body.json'))
+          gemini = next((p for p in data['providers'] if p['id'] == 'gemini'), None)
+          print('gemini entry:', gemini)
+          print('autoResolvesTo:', data.get('autoResolvesTo'))
+          if not gemini or not gemini['available']:
+              raise SystemExit('Gemini is not yet reported as available.')
+          print('Gemini is configured and available.')
+          PYEOF
