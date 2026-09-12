@@ -1,0 +1,25 @@
+name: Scratch investigate
+
+on:
+  workflow_dispatch:
+
+jobs:
+  investigate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fetch render.com blueprint spec docs
+        run: |
+          curl -sS -m 20 "https://render.com/docs/blueprint-spec" -o /tmp/spec.html || true
+          echo "--- length ---"
+          wc -c /tmp/spec.html || true
+          echo "--- grep for dockerfile-related fields ---"
+          grep -oE '[a-zA-Z]*[Dd]ocker[a-zA-Z]*' /tmp/spec.html | sort -u || true
+
+      - name: Fetch a real render-examples Docker blueprint with a subdirectory Dockerfile
+        run: |
+          for repo in php-laravel-docker hermes-render 9router-render-template dify-render-template morphic; do
+            echo "=== $repo ==="
+            curl -sS -m 20 "https://raw.githubusercontent.com/render-examples/$repo/main/render.yaml" || \
+            curl -sS -m 20 "https://raw.githubusercontent.com/render-examples/$repo/master/render.yaml" || true
+            echo ""
+          done
