@@ -1,8 +1,25 @@
 name: AI integration tests
 
-# Real model weights, on demand only. These download several gigabytes and are
-# slow on CPU, so they never run on the pull-request path -- see ci.yml.
+# Real model weights, downloaded for real. These are slow on CPU, so they
+# never run on the ordinary pull-request path -- see ci.yml, which uses the
+# mock engine instead. This workflow proves the actual Chatterbox integration
+# clones a voice rather than emitting a fixed default; see
+# backend/tests/ai/test_chatterbox_engine.py for what it checks.
+#
+# A `push` trigger is included, scoped to only the files that could affect
+# this behaviour, for two reasons: it re-verifies the real model whenever the
+# engine or its tests change, and -- a real GitHub Actions quirk -- a
+# workflow with *only* `workflow_dispatch`/`schedule` triggers is not always
+# registered for manual dispatch via the API/UI until a push event actually
+# matches one of its trigger clauses. Do not remove this trigger without
+# confirming manual dispatch still works.
 on:
+  push:
+    branches: [main]
+    paths:
+      - 'ai/**'
+      - 'backend/tests/ai/**'
+      - '.github/workflows/ai-tests.yml'
   workflow_dispatch:
     inputs:
       variant:
@@ -26,7 +43,10 @@ jobs:
         with:
           python-version: '3.11'
 
-      - run: sudo apt-get update && sudo apt-get install -y --no-install-recommends ffmpeg libsndfile1 espeak-ng
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends ffmpeg libsndfile1 espeak-ng
 
       - name: Cache model weights
         uses: actions/cache@v4
