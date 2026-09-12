@@ -182,17 +182,30 @@ have not audited that toolkit; treat it as a starting point, not a dependency.
 
 ### 4. Wiring it in
 
-The application needs **no changes**. Point the engine at the new checkpoint:
+**Correction, 12 September 2026:** this section originally described a
+`CHATTERBOX_T3_MODEL` environment variable selecting a checkpoint path at
+load time. That mechanism does not exist in `chatterbox-tts==0.1.7` (the
+pinned PyPI release) — verified by installing it and inspecting
+`ChatterboxMultilingualTTS.from_pretrained()` directly: it takes only
+`device` and always downloads the `t3_mtl23ls_v2` checkpoint from Hugging
+Face, with no parameter to point it at a local, fine-tuned file. The
+env var and the `_resolve_multilingual_t3_model()` helper this section
+referenced were written against upstream's `main` branch, which is ahead of
+what has actually been published — the same gap documented in
+[MODEL_RESEARCH.md](./MODEL_RESEARCH.md).
 
-```bash
-CHATTERBOX_T3_MODEL=/path/to/t3_mtl_hy_v1.safetensors
-```
-
-`_resolve_multilingual_t3_model()` accepts any `.safetensors` path, and
-`ChatterboxEngine.info().languages` is what the API and UI read their language
-list from. Add `hy` there and it becomes a native language everywhere — the
-warnings disappear on their own because they are driven by the `experimental`
-flag on the language option, not hardcoded in the UI.
+Wiring in an Armenian fine-tune therefore needs one small, real code change
+in `ai/chatterbox_engine.py::_build_model()`: replace the `from_pretrained`
+call for the `multilingual` branch with `ChatterboxMultilingualTTS.from_local(
+ckpt_dir, device=self.device)` pointed at a local directory containing the
+fine-tuned `t3_mtl23ls_v2.safetensors` alongside the checkpoint's other
+required files (`ve.pt`, `s3gen.pt`, the tokenizer json, `conds.pt`) — `
+from_local` is already part of this release's real, verified API. Everything
+downstream of that — `ChatterboxEngine.info().languages`, which the API and
+UI read their language list from — needs no change: add `hy` there and it
+becomes a native language everywhere, and the experimental-Armenian warnings
+disappear on their own since they are driven by the `experimental` flag on
+the language option, not hardcoded in the UI.
 
 ### 5. Licensing
 
