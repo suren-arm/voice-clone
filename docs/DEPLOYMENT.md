@@ -138,17 +138,27 @@ noticeably longer than every request after it.
 
 ---
 
-## Cloudflare Pages + Hugging Face Spaces (free-tier alternative)
+## Cloudflare Pages + Hugging Face Spaces (requires HF PRO)
 
-Render's free plan cannot run this backend at all — 512MB RAM is not enough
-to load PyTorch plus the model, and it has no persistent disk. **Hugging
-Face Spaces' free "CPU basic" hardware (2 vCPU, 16GB RAM) can actually run
-it**, at the cost of one real limitation: the free tier has no persistent
-storage, so the container's filesystem — the SQLite database, every stored
-voice, and the downloaded model cache — resets whenever the Space restarts
-(a redeploy, or waking up after idling). Each wake re-downloads the model
-(slow but automatic) and starts with an empty voice list. Use this when $0
-matters more than durability; use Render Starter (above) when it doesn't.
+**Correction, 12 September 2026:** this section originally called HF Spaces'
+free `cpu-basic` hardware a genuinely free option. It is not, for a Docker
+backend like this one — verified directly against HF's API, not assumed:
+attempting to create the Space returns `402 Payment Required`, with the
+message *"Static Spaces are free for everyone, but hosting Gradio and
+Docker Spaces on free cpu-basic requires a PRO subscription."* Static
+(plain HTML/JS, no server) Spaces are free; a FastAPI backend is not one of
+those. A HF PRO subscription (~$9/month) is required either way, so this is
+a paid alternative to Render Starter (above), not a free one — pick it only
+if you specifically want it wired into Hugging Face rather than Render, e.g.
+to keep the model weights on the same platform that hosts them.
+
+Once on PRO, the free `cpu-basic` hardware (2 vCPU, 16GB RAM) is enough to
+actually run this model. One real limitation remains regardless of plan:
+the free hardware tier has no persistent storage, so the container's
+filesystem — the SQLite database, every stored voice, and the downloaded
+model cache — resets whenever the Space restarts (a redeploy, or waking up
+after idling). Each wake re-downloads the model and starts with an empty
+voice list. HF's paid "persistent storage" add-on removes this if needed.
 
 ### What's already in the repository
 

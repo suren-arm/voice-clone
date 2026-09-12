@@ -1,13 +1,15 @@
 name: Deploy backend to Hugging Face Spaces
 
-# Alternative backend host to Render (render.yaml / docs/DEPLOYMENT.md),
-# for a genuinely free tier: HF Spaces' free "CPU basic" hardware is 2 vCPU
-# / 16GB RAM, enough to actually load this model, unlike most other free
-# tiers (Render's free plan is 512MB RAM and would OOM on load). Tradeoff:
-# no persistent storage on the free tier -- the container's filesystem
-# resets whenever the Space restarts (redeploy, or waking from idle sleep),
-# so uploaded voices and the downloaded model cache do not survive a
-# restart. Accepted knowingly in exchange for $0/month; see docs/DEPLOYMENT.md.
+# Alternative backend host to Render (render.yaml / docs/DEPLOYMENT.md).
+# NOT free: HF's API returns 402 Payment Required creating a Docker Space on
+# free `cpu-basic` hardware -- only Static Spaces are free; anything with a
+# server (this backend included) needs an HF PRO subscription (~$9/month).
+# Once on PRO, `cpu-basic` is 2 vCPU/16GB RAM, enough to actually load this
+# model. Even then: no persistent storage on that free hardware tier -- the
+# container's filesystem resets whenever the Space restarts (redeploy, or
+# waking from idle sleep), so uploaded voices and the downloaded model cache
+# do not survive a restart. See docs/DEPLOYMENT.md for the full comparison
+# against Render Starter.
 #
 # This workflow builds a self-contained "Space" directory (backend/, ai/,
 # scripts/, a copy of backend/Dockerfile.render as the Space's Dockerfile,
