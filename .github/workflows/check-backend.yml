@@ -13,7 +13,7 @@ on:
       url:
         description: Backend base URL to check
         type: string
-        default: https://voice-clone-api.onrender.com
+        default: https://voice-clone.onrender.com
 
 jobs:
   check:
@@ -21,9 +21,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check /health
+        # Render's free tier spins down on idle and can take 50s+ to wake for
+        # the first request after that -- give it real room rather than
+        # reporting a cold start as "unreachable".
         run: |
           url="${{ inputs.url }}/health"
-          status=$(curl -sS -o /tmp/health.json -w '%{http_code}' -m 20 "$url" || echo "000")
+          status=$(curl -sS -o /tmp/health.json -w '%{http_code}' -m 90 "$url" || echo "000")
           echo "GET $url -> HTTP $status"
           if [ "$status" = "000" ]; then
             echo "::error::Could not reach $url at all (DNS/connection failure or timeout)"
@@ -40,7 +43,7 @@ jobs:
       - name: Check /api/v1/system/info
         run: |
           url="${{ inputs.url }}/api/v1/system/info"
-          status=$(curl -sS -o /tmp/info.json -w '%{http_code}' -m 20 "$url" || echo "000")
+          status=$(curl -sS -o /tmp/info.json -w '%{http_code}' -m 90 "$url" || echo "000")
           echo "GET $url -> HTTP $status"
           echo "--- response body ---"
           cat /tmp/info.json || true
