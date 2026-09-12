@@ -1,0 +1,84 @@
+name: Scratch research 2
+
+on:
+  push:
+    branches: [claude/vibrant-keller-svtt3z]
+    paths:
+      - '.github/workflows/_scratch-research2.yml'
+
+jobs:
+  research:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Does espeak-ng ship a built-in Armenian voice, and what license
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq espeak-ng
+          echo "=== espeak-ng version ==="
+          espeak-ng --version
+          echo "=== voices matching hy/armenian ==="
+          espeak-ng --voices | grep -i -E "hy|armenian" || echo "no match"
+          echo "=== espeak-ng license (Debian copyright) ==="
+          cat /usr/share/doc/espeak-ng/copyright 2>/dev/null | head -30 || echo "no copyright file"
+
+      - name: Search HF for permissively-licensed Armenian TTS (mit/apache/cc0/bsd)
+        run: |
+          for lic in mit apache-2.0 cc0-1.0 bsd-3-clause; do
+            echo "=== license:$lic + armenian ==="
+            curl -sSL "https://huggingface.co/api/models?search=armenian&filter=license:$lic&limit=20" -o /tmp/lic.json || true
+            python3 - <<'PYEOF'
+          import json
+          try:
+              data = json.load(open('/tmp/lic.json'))
+              for m in data:
+                  print(m.get('id'), m.get('tags'))
+              if not data:
+                  print("(none)")
+          except Exception as e:
+              print('parse error', e)
+          PYEOF
+          done
+
+      - name: Search HF for any Piper-format Armenian voice not from davit312
+        run: |
+          curl -sSL "https://huggingface.co/api/models?search=piper+hy&limit=30" -o /tmp/piper1.json || true
+          python3 - <<'PYEOF'
+          import json
+          try:
+              data = json.load(open('/tmp/piper1.json'))
+              for m in data:
+                  print(m.get('id'), m.get('tags'))
+              if not data:
+                  print("(none)")
+          except Exception as e:
+              print('parse error', e)
+          PYEOF
+          echo "--- 'vits armenian' ---"
+          curl -sSL "https://huggingface.co/api/models?search=vits+armenian&limit=30" -o /tmp/piper2.json || true
+          python3 - <<'PYEOF'
+          import json
+          try:
+              data = json.load(open('/tmp/piper2.json'))
+              for m in data:
+                  print(m.get('id'), m.get('tags'))
+              if not data:
+                  print("(none)")
+          except Exception as e:
+              print('parse error', e)
+          PYEOF
+
+      - name: Check Mozilla Common Voice Armenian dataset availability/license
+        run: |
+          curl -sSL "https://huggingface.co/api/datasets?search=common_voice&limit=100" -o /tmp/cv.json || true
+          python3 - <<'PYEOF'
+          import json
+          try:
+              data = json.load(open('/tmp/cv.json'))
+              for d in data:
+                  did = d.get('id', '')
+                  if 'common_voice' in did.lower():
+                      print(did)
+          except Exception as e:
+              print('parse error', e)
+          PYEOF
+          echo "=== mozilla-foundation common_voice_17_0 card (language list / license) ==="
+          curl -sSL "https://huggingface.co/datasets/mozilla-foundation/common_voice_17_0/raw/main/README.md" | head -30 || echo "fetch failed"
