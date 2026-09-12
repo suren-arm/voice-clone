@@ -9,7 +9,7 @@ jobs:
     steps:
       - name: Fetch the live page and every JS chunk it references, grep for the API URL
         run: |
-          base="https://ai-voice-studio-660.pages.dev"
+          base="https://21d8dfd9.ai-voice-studio-660.pages.dev"
           curl -sS "$base/voices/new" -o /tmp/page.html
           echo "=== page.html size ==="
           wc -c /tmp/page.html
