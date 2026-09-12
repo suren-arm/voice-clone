@@ -77,6 +77,11 @@ class Settings(BaseSettings):
     # -- experimental ------------------------------------------------------
     enable_experimental_armenian: bool = True
 
+    # -- fairy-tale generation (Anthropic Claude API) -----------------------
+    anthropic_api_key: str | None = None
+    story_model: str = "claude-opus-5"
+    rate_limit_story_per_hour: int = 30
+
     # -- validators --------------------------------------------------------
     @field_validator("cors_origins", mode="before")
     @classmethod

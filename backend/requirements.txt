@@ -19,3 +19,9 @@ soundfile==0.13.1
 #   pip install torch==2.6.0 torchaudio==2.6.0 --index-url https://download.pytorch.org/whl/cu124
 # Model *weights* are never vendored -- see scripts/download_model.py.
 chatterbox-tts==0.1.7
+
+# ---- Fairy-tale generation ---------------------------------------------
+# Text generation only -- no audio -- for the "Create Fairy Tale" feature.
+# Requires ANTHROPIC_API_KEY at runtime; without it, story generation returns
+# a clear 503 rather than a stack trace (see app/services/story_service.py).
+anthropic==1.5.0

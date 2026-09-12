@@ -386,6 +386,12 @@ a:hover { text-decoration: underline; }
   flex-shrink: 0;
   cursor: pointer;
 }
+.range {
+  width: 100%;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
 .checkbox__text { font-size: 0.9rem; }
 .checkbox__note {
   display: block;
@@ -670,6 +676,13 @@ a:hover { text-decoration: underline; }
 .tile__icon { font-size: 1.4rem; }
 .tile__title { font-weight: 620; }
 .tile__desc { font-size: 0.875rem; color: var(--text-muted); }
+
+.tile--primary {
+  background: linear-gradient(155deg, color-mix(in srgb, var(--accent) 10%, var(--bg-elevated)), var(--bg-elevated));
+  border-color: color-mix(in srgb, var(--accent) 35%, var(--border));
+}
+.tile--primary .tile__icon { font-size: 1.75rem; }
+.tile--primary .tile__title { font-size: 1.05rem; }
 
 .stat-grid {
   display: grid;

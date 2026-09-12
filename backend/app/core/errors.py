@@ -98,6 +98,16 @@ class UnsupportedLanguageError(ValidationError):
     code = "unsupported_language"
 
 
+class StoryServiceUnavailableError(AppError):
+    status_code = status.HTTP_503_SERVICE_UNAVAILABLE
+    code = "story_service_unavailable"
+
+
+class StoryGenerationFailedError(AppError):
+    status_code = status.HTTP_502_BAD_GATEWAY
+    code = "story_generation_failed"
+
+
 def error_body(code: str, message: str, details: dict[str, Any] | None = None) -> dict[str, Any]:
     body: dict[str, Any] = {"error": {"code": code, "message": message}}
     if details:

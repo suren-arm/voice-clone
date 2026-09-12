@@ -17,8 +17,17 @@ class VoiceRepository:
         return self.session.get(Voice, voice_id)
 
     def list(self, *, limit: int = 50, offset: int = 0) -> list[Voice]:
+        """List the caller's own voices -- system-owned default voices excluded.
+
+        Default voices (``source == "system"``, see
+        ``app.services.default_voices``) are a separate, fixed catalog the
+        user did not create and did not use a quota slot for; they are
+        fetched via :meth:`list_by_source` instead, so they never appear in
+        "my voices" pagination or counts.
+        """
         stmt = (
             select(Voice)
+            .where(Voice.source != "system")
             .order_by(Voice.created_at.desc(), Voice.id.desc())
             .limit(limit)
             .offset(offset)
@@ -26,7 +35,16 @@ class VoiceRepository:
         return list(self.session.scalars(stmt))
 
     def count(self) -> int:
-        return int(self.session.scalar(select(func.count()).select_from(Voice)) or 0)
+        return int(
+            self.session.scalar(
+                select(func.count()).select_from(Voice).where(Voice.source != "system")
+            )
+            or 0
+        )
+
+    def list_by_source(self, source: str) -> list[Voice]:
+        stmt = select(Voice).where(Voice.source == source).order_by(Voice.created_at.asc())
+        return list(self.session.scalars(stmt))
 
     def add(self, voice: Voice) -> Voice:
         self.session.add(voice)

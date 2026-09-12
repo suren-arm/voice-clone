@@ -7,6 +7,21 @@ import { PageHeader } from '@/components/PageHeader';
 import { Spinner } from '@/components/Spinner';
 import { useSystemInfo } from '@/hooks/useSystemInfo';
 
+const MODE_TILES = [
+  {
+    href: '/generate',
+    icon: '✍️',
+    title: 'Text to Speech',
+    description: 'Type or paste text and hear it in your cloned voice or a default voice.',
+  },
+  {
+    href: '/fairy-tale',
+    icon: '✨',
+    title: 'Create Fairy Tale',
+    description: 'Generate an original story in English or Հայերեն, then narrate it.',
+  },
+] as const;
+
 const TILES = [
   {
     href: '/voices/new',
@@ -19,12 +34,6 @@ const TILES = [
     icon: '🗂',
     title: 'My Voices',
     description: 'Review, sample and delete your voice profiles.',
-  },
-  {
-    href: '/generate',
-    icon: '✍️',
-    title: 'Generate Speech',
-    description: 'Type text and hear it in a cloned voice.',
   },
   {
     href: '/history',
@@ -40,11 +49,23 @@ export default function HomePage() {
   return (
     <div className="stack-5">
       <PageHeader
-        title="AI Voice Studio"
-        lede="Clone a voice from a short recording, then turn any text into speech with it. Everything runs on your own backend — no third-party voice service involved."
+        title="Voice Story Studio"
+        lede="Clone your own voice, or use a built-in default voice — no recording required. Write text or generate a fairy tale in English or Հայերեն, and narrate it with optional background ambience. Everything runs on your own backend."
       />
 
-      <nav className="home-actions" aria-label="Primary actions">
+      <nav className="home-actions" aria-label="Main modes">
+        {MODE_TILES.map((tile) => (
+          <Link key={tile.href} href={tile.href} className="tile tile--primary">
+            <span className="tile__icon" aria-hidden="true">
+              {tile.icon}
+            </span>
+            <span className="tile__title">{tile.title}</span>
+            <span className="tile__desc">{tile.description}</span>
+          </Link>
+        ))}
+      </nav>
+
+      <nav className="home-actions" aria-label="More actions">
         {TILES.map((tile) => (
           <Link key={tile.href} href={tile.href} className="tile">
             <span className="tile__icon" aria-hidden="true">

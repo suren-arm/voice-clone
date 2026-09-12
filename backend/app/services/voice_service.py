@@ -184,6 +184,10 @@ class VoiceService:
     def list(self, *, limit: int, offset: int) -> tuple[list[Voice], int]:
         return self.voices.list(limit=limit, offset=offset), self.voices.count()
 
+    def list_default_voices(self) -> list[Voice]:
+        """The fixed, system-owned default-voice catalog (not user data)."""
+        return self.voices.list_by_source("system")
+
     def reference_file(self, voice_id: str) -> Path:
         voice = self.get(voice_id)
         path = self.storage.reference_path(voice.id)

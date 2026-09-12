@@ -7,6 +7,11 @@ export function listVoices(limit = 100, offset = 0): Promise<Page<Voice>> {
   return getJson<Page<Voice>>(`${BASE}?limit=${limit}&offset=${offset}`);
 }
 
+/** The fixed, built-in default-voice catalog -- not the caller's own voices. */
+export function getDefaultVoices(): Promise<Voice[]> {
+  return getJson<Voice[]>(`${BASE}/defaults`);
+}
+
 export function getVoice(voiceId: string): Promise<Voice> {
   return getJson<Voice>(`${BASE}/${encodeURIComponent(voiceId)}`);
 }

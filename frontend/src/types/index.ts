@@ -15,13 +15,19 @@ export interface Voice {
   engineVariant: string | null;
   referenceDurationSeconds: number;
   referenceSampleRate: number;
-  source: 'upload' | 'record';
+  /** "system" is a built-in default voice (espeak-ng), not a user recording. */
+  source: 'upload' | 'record' | 'system';
   generationCount: number;
   lastUsedAt: string | null;
   consentGiven: boolean;
   hasConditioningCache: boolean;
   sampleUrl: string | null;
 }
+
+/** "none" plus every background track the backend actually has an asset for. */
+export type BackgroundSound = 'none' | 'mystical';
+
+export type VoiceSource = 'cloned' | 'default';
 
 export interface Generation {
   id: string;
@@ -39,6 +45,9 @@ export interface Generation {
   watermarked: boolean;
   experimental: boolean;
   notice: string | null;
+  backgroundSound: BackgroundSound;
+  backgroundApplied: boolean;
+  backgroundNotice: string | null;
 }
 
 export interface PageMeta {
@@ -110,6 +119,29 @@ export interface GenerateSpeechInput {
   cfgWeight?: number;
   temperature?: number;
   seed?: number;
+  backgroundSound?: BackgroundSound;
+  backgroundVolume?: number;
+}
+
+export type StoryLanguage = 'en' | 'hy';
+export type StoryLength = 'short' | 'medium' | 'long';
+export type StoryAgeGroup = '3-5' | '6-8' | '9-12';
+export type StoryTone = 'magical' | 'funny' | 'adventure' | 'educational' | 'bedtime';
+
+export interface GenerateStoryInput {
+  language: StoryLanguage;
+  characters: string;
+  idea: string;
+  ageGroup: StoryAgeGroup;
+  length: StoryLength;
+  tone: StoryTone;
+}
+
+export interface Story {
+  title: string;
+  text: string;
+  language: StoryLanguage;
+  wordCount: number;
 }
 
 /** Shape of the backend's error envelope. */

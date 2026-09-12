@@ -1,25 +1,42 @@
-# AI Voice Studio
+# Voice Story Studio
 
-Open-source voice cloning as a web application. Record 10–30 seconds in your
-browser, get a reusable voice profile, then turn any text into speech in that
-voice — all on your own backend, with no third-party voice service involved.
+Open-source voice cloning and story narration as a web application. Clone
+your own voice from a 10–30 second recording, or skip that entirely and use a
+built-in default voice. Write text or generate an original fairy tale in
+English or Armenian, then narrate it — optionally with a background ambience
+mixed under the narration. Everything runs on your own backend; the only
+third-party call is to the Anthropic API, and only for fairy-tale text
+generation.
 
-**Model:** [Chatterbox Multilingual V3](https://github.com/resemble-ai/chatterbox)
+**Voice cloning model:** [Chatterbox Multilingual V3](https://github.com/resemble-ai/chatterbox)
 by Resemble AI — MIT-licensed **code *and* weights**, 23 languages, zero-shot
 cloning from ~10 seconds of audio, neural watermarking built in.
 
+**Default voices:** [espeak-ng](https://github.com/espeak-ng/espeak-ng)
+(GPL-3.0, already a runtime dependency — see [Features](#features)) — real,
+native English and Armenian synthesis, no recording required, honestly
+labelled "Classic" quality rather than passed off as natural neural speech.
+
+**Story generation:** [Claude](https://www.anthropic.com/claude) (Opus 5) via
+the Anthropic API — generates fairy tales natively in the target language.
+
 ```
-Browser  ──HTTPS──▶  FastAPI  ──▶  VoiceCloningEngine  ──▶  PyTorch (CUDA / CPU / MPS)
- record                REST         (Chatterbox | Mock)
- upload                              │
- playback                            ▼
-                              SQLite + filesystem
+                                        ┌─▶ VoiceCloningEngine ─▶ PyTorch (CUDA/CPU/MPS)
+Browser ──HTTPS──▶ FastAPI ──┬─ speech ─┤
+ record/type         REST    │          └─▶ espeak-ng (default voices, en + hy)
+ playback                    │                    │
+                              └─ stories ─▶ Anthropic API (Claude)
+                                                   │
+                                     ffmpeg mixes narration + ambience
+                                                   │
+                                        SQLite + filesystem
 ```
 
 ---
 
 ## Contents
 
+- [Features](#features)
 - [Screenshots](#screenshots)
 - [Why this model](#why-this-model)
 - [Armenian](#armenian)
@@ -39,15 +56,56 @@ Browser  ──HTTPS──▶  FastAPI  ──▶  VoiceCloningEngine  ──▶
 
 ---
 
+## Features
+
+- **Two voice sources.** *My Cloned Voice* (Chatterbox, requires a recording)
+  or *Default Voice* (espeak-ng, no recording — English and Armenian).
+- **Two modes.** *Text to Speech* for text you write yourself, and
+  *Create Fairy Tale* — describe characters, an idea, age group, length and
+  tone, and Claude generates an original story you can edit before narrating.
+- **English and Armenian.** Manual text, fairy-tale generation, and default-voice
+  TTS all genuinely support both. Cloned-voice narration does not yet support
+  Armenian — the UI disables that specific combination and explains why,
+  rather than allowing a request that fails obscurely (see
+  [Armenian](#armenian)).
+- **Background ambience.** Optional, mixed under the narration via ffmpeg —
+  currently *None* and *Mystical* (a self-generated, license-free synth pad;
+  see `scripts/generate_ambience.py`). The narration always stays louder and
+  clearer than the background, whatever the volume slider is set to.
+- **Long-text-safe narration.** Fairy tales are chunked at paragraph/sentence
+  boundaries — never mid-word — synthesized per chunk, and concatenated, so a
+  long story doesn't risk a single giant, fragile TTS call.
+- Everything from the original voice-cloning app is unchanged: recording,
+  upload, consent, voice management, playback, download, watermarking.
+
+### Support matrix
+
+| | English | Armenian |
+|---|---|---|
+| Manual text input | ✅ | ✅ |
+| Fairy-tale generation | ✅ (native) | ✅ (native, not translated) |
+| Default-voice TTS | ✅ (espeak-ng) | ✅ (espeak-ng, native phonetics) |
+| Voice cloning (create a voice) | ✅ | ⚠️ experimental only ([docs/ARMENIAN.md](docs/ARMENIAN.md)) |
+| Cloned-voice TTS | ✅ | ❌ disabled in the UI — see [Armenian](#armenian) |
+| Background ambience (Mystical) | ✅ | ✅ |
+
+"✅" means genuinely supported and tested, not merely accepted by the API.
+Nothing in this table is marked supported based on what a model claims to do —
+see [Armenian](#armenian) and [docs/ARMENIAN.md](docs/ARMENIAN.md) for what was
+actually verified and why the one ❌ exists.
+
+---
+
 ## Screenshots
 
-> _Placeholder — add captures of the four screens here._
+> _Placeholder — add captures of the screens here._
 
 | Screen | Path |
 |---|---|
-| Home — status and entry points | `/` |
+| Home — Voice Story Studio, two main modes | `/` |
+| Text to Speech — language, voice source, voice, background | `/generate` |
+| Create Fairy Tale — story params, editable text, narration | `/fairy-tale` |
 | Create Voice — record or upload, guidance, consent | `/voices/new` |
-| Generate Speech — voice, language, text, character counter | `/generate` |
 | Generated Audio — player, RTF, download | `/history` |
 
 ---
@@ -84,20 +142,36 @@ streaming for a live voice agent. Swapping either in means one new file in
 
 ## Armenian
 
-> **Native Armenian support: none.** No open-source zero-shot voice-cloning
-> model supports Armenian, verified as of 11 September 2026.
+Two separate questions, two separate answers:
+
+> **Armenian *default-voice* TTS (no cloning): yes, genuinely.** The Armenian
+> default voice uses espeak-ng's built-in `hy` (Eastern Armenian) and `hyw`
+> (Western Armenian) voices — real synthesis, correct native phonetics,
+> honestly labelled "Classic" (formant, not neural) quality. This is what the
+> Voice Story Studio UI uses for Armenian narration, and it is not gated
+> behind any flag.
 >
-> **Possible experimental Armenian support: yes, and it ships here** — Armenian
-> script is transliterated into Russian orthography (a much closer phonological
-> fit than Latin) and spoken in your cloned voice. It is labelled experimental
-> in the API, in the UI, and on the stored record.
+> **Native Armenian voice *cloning*: none.** No open-source zero-shot
+> voice-cloning model supports Armenian, verified as of 11 September 2026.
+> The UI does not offer "My Cloned Voice" + Armenian at all — it disables that
+> combination with an explanation, rather than allowing a request through to
+> an obscure backend error.
+>
+> **An experimental cloned-voice approximation exists behind a flag, for the
+> raw API only.** Armenian script can be transliterated into Russian
+> orthography (a much closer phonological fit than Latin) and spoken in your
+> cloned voice via `POST /api/v1/speech`. It is labelled experimental in the
+> API and on the stored record, but the Voice Story Studio UI does not expose
+> it — see the reasoning above.
 
-Expect a recognisable Armenian accent with wrong stress placement — not
-Armenian TTS. What was verified, why Russian and not Latin, and the fine-tuning
-path to real support (Common Voice `hy-AM` has 34.3 validated hours; eSpeak NG
-has verified `hy`/`hyw` G2P): **[docs/ARMENIAN.md](docs/ARMENIAN.md)**.
+Expect a recognisable Armenian accent with wrong stress placement from the
+experimental path — not real Armenian TTS. What was verified for both
+questions (why espeak-ng over Piper's GPL-2.0 voice or Meta's non-commercial
+MMS-TTS; why Russian and not Latin for the transliteration bridge; the
+fine-tuning path to real cloning support): **[docs/ARMENIAN.md](docs/ARMENIAN.md)**.
 
-Disable with `ENABLE_EXPERIMENTAL_ARMENIAN=false`.
+Disable the experimental cloned-voice bridge (API-only; the UI never exposed
+it) with `ENABLE_EXPERIMENTAL_ARMENIAN=false`.
 
 ---
 
@@ -265,8 +339,11 @@ Full list with comments in [`.env.example`](.env.example). The ones that matter:
 | `MAX_TEXT_CHARS` | 2000 | Caps worst-case request latency |
 | `REQUIRE_CONSENT` | `true` | Do not disable in production |
 | `RATE_LIMIT_ENABLED` | `true` | |
-| `ENABLE_EXPERIMENTAL_ARMENIAN` | `true` | |
+| `ENABLE_EXPERIMENTAL_ARMENIAN` | `true` | API-only; the UI never exposes cloned+Armenian regardless |
 | `DATABASE_URL` | `sqlite:///storage/voice_studio.db` | Any SQLAlchemy URL |
+| `ANTHROPIC_API_KEY` | unset | Required for "Create Fairy Tale"; unset disables just that feature |
+| `STORY_MODEL` | `claude-opus-5` | |
+| `RATE_LIMIT_STORY_PER_HOUR` | `30` | |
 
 ---
 
@@ -276,23 +353,27 @@ Full list with comments in [`.env.example`](.env.example). The ones that matter:
 voice-clone/
 ├── ai/                          model-agnostic inference layer (no web deps)
 │   ├── engine.py                VoiceCloningEngine contract, VoiceProfile
-│   ├── chatterbox_engine.py     the real implementation
+│   ├── chatterbox_engine.py     the real (cloning) implementation
+│   ├── espeak_engine.py         default-voice synthesis (English + Armenian)
 │   ├── mock_engine.py           dependency-free test double
 │   ├── audio_processing.py      sniff → decode → validate → trim → normalise
+│   ├── audio_mix.py             narration + background-ambience mixing (ffmpeg)
+│   ├── text_chunking.py         paragraph/sentence-safe chunking for long text
 │   ├── model_loader.py          device selection, weight download
 │   ├── armenian.py              experimental transliteration bridge
-│   └── registry.py              engine singleton
+│   └── registry.py              cloning-engine singleton
 │
 ├── backend/
 │   ├── app/
-│   │   ├── main.py              app factory, middleware, health
-│   │   ├── api/v1/              voices · speech · generations · system
+│   │   ├── main.py              app factory, middleware, health, default-voice bootstrap
+│   │   ├── api/v1/              voices · speech · generations · stories · system
+│   │   ├── assets/ambience/     self-generated background tracks (mystical.wav)
 │   │   ├── core/                config · errors · security · rate limiting
 │   │   ├── db/                  engine, session, base
 │   │   ├── models/              SQLAlchemy: Voice, Generation, AuditEvent
 │   │   ├── schemas/             Pydantic request/response (camelCase)
 │   │   ├── repositories/        data access
-│   │   └── services/            voice · speech · language · storage
+│   │   └── services/            voice · speech · story · language · default_voices · storage
 │   ├── tests/{unit,api,integration,ai}/
 │   ├── requirements.txt         full stack
 │   ├── requirements-ci.txt      no torch — what CI installs
@@ -300,18 +381,18 @@ voice-clone/
 │
 ├── frontend/
 │   ├── src/
-│   │   ├── app/                 App Router pages
+│   │   ├── app/                 App Router pages, incl. fairy-tale/
 │   │   ├── components/          shared UI
-│   │   ├── features/            voices/ · speech/
-│   │   ├── hooks/               useRecorder · useVoices · useSystemInfo · …
+│   │   ├── features/            voices/ · speech/ · story/
+│   │   ├── hooks/               useRecorder · useVoices · useDefaultVoices · useSystemInfo · …
 │   │   ├── services/            the only code that knows the API exists
 │   │   ├── types/               API contract types
-│   │   └── utils/               format · audio · validation
+│   │   └── utils/               format · audio · validation · voiceCapability
 │   ├── e2e/                     Playwright
 │   └── Dockerfile
 │
 ├── docs/                        research, architecture, API, security, …
-├── scripts/                     download_model.py · benchmark.py
+├── scripts/                     download_model.py · benchmark.py · generate_ambience.py
 ├── storage/                     voices/ · generated/ (gitignored)
 └── docker-compose{,.gpu}.yml
 ```
@@ -327,16 +408,20 @@ Full reference: **[docs/API.md](docs/API.md)** · Interactive: `/docs`
 
 ```http
 POST   /api/v1/voices                       create a voice profile (multipart)
-GET    /api/v1/voices                       list
+GET    /api/v1/voices                       list your own voices
+GET    /api/v1/voices/defaults              list the built-in default voices
 GET    /api/v1/voices/{id}                  get one
 GET    /api/v1/voices/{id}/sample           reference audio
 DELETE /api/v1/voices/{id}                  delete voice + all its generations
 
-POST   /api/v1/speech                       generate speech
+POST   /api/v1/speech                       generate speech (cloned or default voice,
+                                             optional backgroundSound/backgroundVolume)
 GET    /api/v1/generations                  list (filter with ?voiceId=)
 GET    /api/v1/generations/{id}             get one
 GET    /api/v1/generations/{id}/audio       stream (Range) or ?download=true
 DELETE /api/v1/generations/{id}             delete
+
+POST   /api/v1/stories/generate             generate a fairy tale (English or Armenian)
 
 GET    /api/v1/system/info                  engine, languages, limits
 GET    /health                              liveness
@@ -345,22 +430,31 @@ GET    /health                              liveness
 `POST /speech` returns JSON with an `audioUrl` rather than raw bytes, so history,
 provenance metadata and byte-range seeking all work — reasoning in
 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md#json-with-audiourl-not-raw-audiowav).
+Default voices are ordinary `Voice` rows (`source: "system"`, `engine:
+"espeak-ng"`) so `POST /speech` needs no separate "default" endpoint — pass
+one of their IDs as `voiceId` exactly like a cloned voice. They are excluded
+from `GET /voices` and its pagination/quota (that endpoint is your own voices
+only); fetch them from `GET /voices/defaults`.
+
+`POST /stories/generate` is text-only: it returns `{title, text, language,
+wordCount}`. Narrating the result — or any manually-typed text — is the same
+`POST /speech` call, no separate "narrate" endpoint.
 
 ---
 
 ## Testing
 
 ```bash
-# Backend — 116 tests, mock engine, no weights, ~4 s
+# Backend — 153 tests, mock engine + real espeak-ng, no torch weights, ~16 s
 cd backend && pytest
 
 # By layer
 pytest tests/unit tests/api tests/integration
 
-# Real model — opt-in, downloads weights
+# Real cloning model — opt-in, downloads weights
 pytest -m ai tests/ai
 
-# Frontend — 61 unit tests
+# Frontend — 62 unit tests
 cd frontend && npm run test:run
 
 # End-to-end — 10 tests, desktop + mobile viewports
@@ -458,10 +552,13 @@ frontend needs no Workers runtime adapter either: every route is already a
 static, client-rendered page, so `next build` with `CLOUDFLARE_BUILD=1`
 produces a plain static export Cloudflare Pages serves directly.
 
-Two things to get right, wherever you deploy: `NEXT_PUBLIC_API_URL` is
+Three things to get right, wherever you deploy: `NEXT_PUBLIC_API_URL` is
 compiled into the frontend bundle at build time (changing it needs a rebuild),
-and `CORS_ORIGINS` on the backend must list the frontend's exact origin, set
-*after* the frontend's first deploy since that's when the URL is assigned.
+`CORS_ORIGINS` on the backend must list the frontend's exact origin, set
+*after* the frontend's first deploy since that's when the URL is assigned, and
+`ANTHROPIC_API_KEY` must be set on the backend host (Render environment
+variable, not a build-time/frontend value) for "Create Fairy Tale" to work —
+every other feature works without it.
 **HTTPS is mandatory** — `getUserMedia` refuses to run outside a secure
 context, so microphone recording simply will not work over plain HTTP. Both
 platforms provide HTTPS by default on their `*.pages.dev` / `*.onrender.com`
