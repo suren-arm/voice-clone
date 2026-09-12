@@ -125,7 +125,7 @@ jobs:
           else
             echo "Project '$CF_PROJECT' already exists."
           fi
-          subdomain=$(echo "$body" | grep -o '"subdomain":"[^"]*"' | head -n1 | cut -d'"' -f4)
+          subdomain=$(echo "$body" | jq -r '.result.subdomain // empty')
           if [ -z "$subdomain" ]; then
             echo "::error::Could not determine the project's subdomain from the API response"
             exit 1
