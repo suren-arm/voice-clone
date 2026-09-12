@@ -33,3 +33,32 @@ jobs:
               raise SystemExit('Gemini is not yet reported as available.')
           print('Gemini is configured and available.')
           PYEOF
+
+      - name: End-to-end story generation via Gemini (English)
+        run: |
+          curl -sS -m 60 -X POST "${{ inputs.url }}/api/v1/stories/generate" \
+            -H 'Content-Type: application/json' \
+            -d '{"provider":"gemini","language":"en","characters":"A rabbit and a fox","idea":"they become unlikely friends in a meadow","ageGroup":"6-8","length":"short","tone":"magical"}' \
+            -o /tmp/story.json -w '\nHTTP %{http_code}\n'
+          cat /tmp/story.json
+          python3 -c "
+          import json
+          data = json.load(open('/tmp/story.json'))
+          assert 'text' in data and len(data['text']) > 20, data
+          print('Story generated OK, provider:', data.get('provider'), '/', data.get('providerName'))
+          print('word count:', data.get('wordCount'))
+          "
+
+      - name: End-to-end story generation via Gemini (Armenian)
+        run: |
+          curl -sS -m 60 -X POST "${{ inputs.url }}/api/v1/stories/generate" \
+            -H 'Content-Type: application/json' \
+            -d '{"provider":"gemini","language":"hy","characters":"Կարապետ և Ռուզաննա","idea":"adventure in a magical forest with giant animals","ageGroup":"6-8","length":"short","tone":"magical"}' \
+            -o /tmp/story_hy.json -w '\nHTTP %{http_code}\n'
+          cat /tmp/story_hy.json
+          python3 -c "
+          import json
+          data = json.load(open('/tmp/story_hy.json'))
+          assert 'text' in data and len(data['text']) > 20, data
+          print('Armenian story generated OK, provider:', data.get('provider'))
+          "
