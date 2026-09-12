@@ -1,20 +1,30 @@
 # Armenian Language Support
 
-**Research date: 11 September 2026.**
+**Research date: 11 September 2026. Updated: 12 September 2026 (default-voice
+TTS research for the Voice Story Studio work — see the new section below).**
 
 ## The short version
 
-> **Native Armenian support: none.**
+> **Native Armenian voice *cloning*: none.**
 > No open-source zero-shot voice-cloning model supports Armenian, as of this date.
 >
-> **Possible experimental Armenian support: yes, and it ships in this app** —
-> behind a flag, labelled as experimental everywhere it appears.
+> **Native Armenian *default-voice* TTS: yes** — `espeak-ng`'s built-in `hy`
+> (Eastern Armenian) voice, real synthesis with correct phonetics, honestly
+> labelled as a "Classic" (formant, non-neural) voice rather than passed off as
+> natural neural speech. See "Default-voice Armenian TTS" below for why this
+> was chosen over the neural alternatives that were evaluated and rejected.
+>
+> **Possible experimental Armenian *cloning* support: yes, and it ships in this
+> app** — behind a flag, labelled as experimental everywhere it appears.
 
-Those two statements are kept strictly separate throughout the product: in the
-API (`native: false, experimental: true` on the language option), in the UI (an
-"Experimental language" warning before you generate, and an "Experimental
-output" banner after), and on the stored record (`experimental = true` on the
-generation row).
+Those two statements about cloning are kept strictly separate throughout the
+product: in the API (`native: false, experimental: true` on the language
+option), in the UI (an "Experimental language" warning before you generate,
+and an "Experimental output" banner after), and on the stored record
+(`experimental = true` on the generation row). The default-voice path is a
+separate, non-experimental capability — it does not clone anyone's voice, it
+just speaks Armenian in a fixed synthetic voice, and it is labelled by quality
+tier ("Classic"), not by an experimental/production distinction.
 
 ---
 
@@ -213,6 +223,41 @@ Chatterbox's weights are MIT, so a fine-tune can be released under whatever
 terms you choose — **but the training data carries its own licence**. Common
 Voice is CC-0, which is clean. MMS-TTS outputs are CC-BY-NC, so do **not**
 distil from them into a model you intend to use commercially.
+
+---
+
+---
+
+## Default-voice Armenian TTS (12 September 2026)
+
+The Voice Story Studio work needed an Armenian *default voice* — a fixed,
+non-cloned voice a user can pick for narration without ever recording
+themselves, distinct from the voice-cloning question above. This is a
+different, easier problem (no cloning required), but it still needs a real,
+correctly-licensed model — not a placeholder. Verified via a GitHub
+Actions runner (this sandbox cannot reach `huggingface.co` directly), every
+candidate below was checked against the model's own stated license, not
+assumed from how the model is described elsewhere.
+
+### Candidates evaluated
+
+| Option | Quality | License | Verdict |
+|---|---|---|---|
+| **`espeak-ng` built-in `hy`/`hyw` voices** | Formant/rule-based — robotic but linguistically correct | GPL-3.0 (the espeak-ng binary), but **already a runtime dependency** of `backend/Dockerfile.render` (used via subprocess, same pattern as `ffmpeg`) — shipping its Armenian voice adds no *new* license surface | **Chosen.** Zero new licensing risk, genuinely native Armenian phonetics for both Eastern (`hy`) and Western (`hyw`) Armenian, works entirely offline/CPU. Must be labelled "Classic" quality in the UI — it sounds mechanical, and claiming otherwise would violate the "do not fake voice availability" requirement in spirit. |
+| **Piper `hy_AM-gor-medium`** ([`rhasspy/piper-voices`](https://huggingface.co/rhasspy/piper-voices)) | Neural (VITS/ONNX), natural-sounding, ~63MB, single speaker | The collection's blanket repo README says `license: mit`, but this specific voice's own `MODEL_CARD` states its training dataset (`davit312/piper-TTS-Armenian`) is **GPL-2.0** — confirmed by fetching the file directly. The blanket "mit" header covers Piper's own code/infra, not this voice's data. | **Rejected for now.** Real and good-quality, but GPL-2.0-encumbered in a way that is not obviously safe to embed in a product with different licensing goals. Documented here in case the product's licensing stance changes later — do not silently upgrade to this without re-deciding the tradeoff. |
+| **`facebook/mms-tts-hye`** (Eastern Armenian) | Neural (VITS), single speaker | CC-BY-NC-4.0 (non-commercial) — corroborated by the sibling `facebook/mms-tts-hyw` being independently tagged `license:cc-by-nc-4.0` in Hugging Face's own model index (the `hye` repo's README fetch was blocked/gated at research time) | **Rejected**, same reason as the original research above: non-commercial clause is incompatible with a product that might ever be monetized. |
+| **`ArthurYeghinyan/armenian-speecht5-sota`** | Neural (SpeechT5 + HiFi-GAN) | **Apache-2.0** — genuinely permissive | **Rejected on quality grounds, not license.** This is the only fully-permissive neural option found. Its own model card reports a **66.67% word error rate** against Whisper-large-v3 (vs. 43.04% WER on real human recordings) while simultaneously claiming to "surpass human acoustic clarity" — a self-contradictory, hype-driven presentation from a single-contributor upload with no independent verification available. A ~2-in-3 word error rate is not shippable quality. Worth re-evaluating later if this improves or a comparable Apache/MIT model appears, but not by trusting the README — by actually listening to output. |
+| **`Anadilorg/Anadil_Armenian_TTS`** (LoRA on `openbmb/VoxCPM2`) | Unknown — untested | MIT | **Rejected**, not evaluated further: built on a large conversational base model almost certainly too heavy for the existing CPU-only Render Starter instance already running Chatterbox, and tagged for Western Armenian/Turkey rather than the Eastern Armenian (Armenia) this app targets. |
+
+### Decision
+
+Ship `espeak-ng`'s Armenian voice as the Armenian default voice, labelled
+"Classic" in the capability model and UI (see the voice capability schema
+added for the Voice Story Studio feature). Do not ship the Piper or MMS-TTS
+options without a separate, explicit decision given their license
+restrictions. Revisit the SpeechT5 option if a listening test (not just the
+README) confirms usable quality, or if a comparably-licensed model with
+verified quality appears later.
 
 ---
 
