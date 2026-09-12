@@ -26,17 +26,20 @@
 # run once from the Render dashboard's Shell tab:
 #   python ../scripts/download_model.py --variant turbo
 
-# NOTE ON SCHEMA: this session has no network access to render.com to
-# validate the blueprint live (see docs/DEPLOYMENT.md for why). The fields
-# below are the long-stable subset of Render's Blueprint spec rather than any
-# newer alias -- if the dashboard flags a field as unrecognized, check
-# https://render.com/docs/blueprint-spec for its current name and fix just
-# that line; the service topology (Docker web service + disk + env vars)
-# is what matters and is not expected to change.
+# SCHEMA NOTE, 12 September 2026: verified against real, current examples
+# (render-examples/hermes-render and .../morphic on GitHub, fetched via a
+# GitHub Actions runner since render.com is unreachable from the coding
+# sandbox that maintains this file). The Docker runtime key is `runtime:
+# docker`, not the legacy `env: docker` this file used until a real deploy
+# attempt failed with "open Dockerfile: no such file or directory" --
+# Render silently ignored `dockerfilePath`/`dockerContext` under the old
+# key rather than erroring, and fell back to looking for a bare `Dockerfile`
+# at the repo root. `dockerfilePath`/`dockerContext` themselves were already
+# correct field names.
 services:
   - type: web
     name: voice-clone-api
-    env: docker
+    runtime: docker
     dockerfilePath: ./backend/Dockerfile.render
     dockerContext: .
     plan: starter
