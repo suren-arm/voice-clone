@@ -138,6 +138,63 @@ noticeably longer than every request after it.
 
 ---
 
+## Cloudflare Pages + Hugging Face Spaces (free-tier alternative)
+
+Render's free plan cannot run this backend at all — 512MB RAM is not enough
+to load PyTorch plus the model, and it has no persistent disk. **Hugging
+Face Spaces' free "CPU basic" hardware (2 vCPU, 16GB RAM) can actually run
+it**, at the cost of one real limitation: the free tier has no persistent
+storage, so the container's filesystem — the SQLite database, every stored
+voice, and the downloaded model cache — resets whenever the Space restarts
+(a redeploy, or waking up after idling). Each wake re-downloads the model
+(slow but automatic) and starts with an empty voice list. Use this when $0
+matters more than durability; use Render Starter (above) when it doesn't.
+
+### What's already in the repository
+
+`.github/workflows/deploy-hf-space.yml` builds a self-contained Space
+directory (`backend/`, `ai/`, `scripts/`, `backend/Dockerfile.render` as the
+Space's `Dockerfile`, and a generated `README.md` carrying the Space's
+required YAML frontmatter) and uses the `huggingface_hub` Python API to
+create the Space — if it doesn't already exist — and upload that directory,
+on every push to `main` that touches the backend. No git-remote wrangling,
+and no dashboard click-through beyond the one-time token below: unlike
+Render, HF's API can create the Space itself, so the only account-specific
+manual step is generating the token.
+
+### One-time setup (2 minutes, needs a browser and your own HF account)
+
+1. [huggingface.co](https://huggingface.co) → **Settings → Access Tokens →
+   New token**, role **Write**. Copy it.
+2. This repo → **Settings → Secrets and variables → Actions**:
+   | Type | Name | Value |
+   |---|---|---|
+   | Secret | `HF_TOKEN` | the token from step 1 |
+   | Variable | `CLOUDFLARE_PAGES_URL` | the frontend's exact origin, e.g. `https://ai-voice-studio-660.pages.dev` (no trailing slash) — becomes `CORS_ORIGINS` on the Space |
+   | Variable | `HF_SPACE_ID` | optional; defaults to `voice-clone-api` |
+3. Push to `main` (touching `backend/**`), or run **Deploy backend to
+   Hugging Face Spaces** manually from the Actions tab.
+4. The workflow prints the Space's URL:
+   `https://huggingface.co/spaces/<your-username>/voice-clone-api`. The
+   *API* itself is served from a different host — Spaces run behind
+   `https://<username>-<space-id>.hf.space` (username lowercased, `_`
+   replaced with `-`) — use that as `NEXT_PUBLIC_API_URL`, not the
+   `huggingface.co/spaces/...` page URL, which is just the Space's dashboard.
+
+### Verifying it worked
+
+```bash
+curl -s https://<username>-voice-clone-api.hf.space/health
+curl -s https://<username>-voice-clone-api.hf.space/api/v1/system/info | python3 -m json.tool
+```
+
+The first request after any restart pays the model-download cost (slower
+than Render, since there's no persistent `HF_HOME` cache to survive
+between restarts) — expect it to take noticeably longer than subsequent
+ones, on top of the usual first-request model-load delay both hosts share.
+
+---
+
 ## Recommended MVP: one GPU box, both containers
 
 Simplest thing that works, and the cheapest way to have a real deployment:

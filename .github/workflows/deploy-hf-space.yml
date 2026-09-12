@@ -1,0 +1,158 @@
+name: Deploy backend to Hugging Face Spaces
+
+# Alternative backend host to Render (render.yaml / docs/DEPLOYMENT.md),
+# for a genuinely free tier: HF Spaces' free "CPU basic" hardware is 2 vCPU
+# / 16GB RAM, enough to actually load this model, unlike most other free
+# tiers (Render's free plan is 512MB RAM and would OOM on load). Tradeoff:
+# no persistent storage on the free tier -- the container's filesystem
+# resets whenever the Space restarts (redeploy, or waking from idle sleep),
+# so uploaded voices and the downloaded model cache do not survive a
+# restart. Accepted knowingly in exchange for $0/month; see docs/DEPLOYMENT.md.
+#
+# This workflow builds a self-contained "Space" directory (backend/, ai/,
+# scripts/, a copy of backend/Dockerfile.render as the Space's Dockerfile,
+# and a README.md carrying the Space's required YAML frontmatter), then
+# uses the huggingface_hub Python API to create the Space (if it doesn't
+# exist yet) and upload that directory -- no git remote wrangling needed.
+#
+# One-time setup:
+#   1. huggingface.co -> Settings -> Access Tokens -> New token, "Write" role.
+#   2. This repo -> Settings -> Secrets and variables -> Actions:
+#        Secret:   HF_TOKEN
+#        Variable: HF_SPACE_ID        (optional; defaults to voice-clone-api)
+#                  CLOUDFLARE_PAGES_URL (the frontend's exact origin, for CORS_ORIGINS)
+#   3. Push to main, or run this workflow manually.
+#
+# Until HF_TOKEN exists, this no-ops with a warning instead of failing.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'backend/**'
+      - 'ai/**'
+      - 'scripts/**'
+      - '.github/workflows/deploy-hf-space.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: hf-space-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Build and deploy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check required secret is configured
+        id: preflight
+        run: |
+          if [ -z "${{ secrets.HF_TOKEN }}" ]; then
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::HF_TOKEN is not set as a repository secret. Skipping deploy -- see the comment at the top of this workflow file for one-time setup steps."
+          else
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/setup-python@v5
+        if: steps.preflight.outputs.configured == 'true'
+        with:
+          python-version: '3.11'
+
+      - name: Install huggingface_hub
+        if: steps.preflight.outputs.configured == 'true'
+        run: pip install -U huggingface_hub
+
+      - name: Prepare the Space's build context
+        if: steps.preflight.outputs.configured == 'true'
+        run: |
+          rm -rf space_build
+          mkdir -p space_build
+          cp -r backend space_build/backend
+          cp -r ai space_build/ai
+          cp -r scripts space_build/scripts
+          cp backend/Dockerfile.render space_build/Dockerfile
+          cat > space_build/README.md <<'EOF'
+          ---
+          title: Voice Clone API
+          emoji: 🎙️
+          colorFrom: blue
+          colorTo: purple
+          sdk: docker
+          app_port: 8000
+          pinned: false
+          ---
+
+          Backend API for [AI Voice Studio](https://github.com/suren-arm/voice-clone)
+          (voice cloning + text-to-speech via Chatterbox). This Space is deployed
+          automatically from that repository's `backend/` and `ai/` directories --
+          changes belong there, not here.
+          EOF
+
+      - name: Create/update the Space and upload
+        if: steps.preflight.outputs.configured == 'true'
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          HF_SPACE_ID: ${{ vars.HF_SPACE_ID || 'voice-clone-api' }}
+          CORS_ORIGINS: ${{ vars.CLOUDFLARE_PAGES_URL || '' }}
+        run: |
+          python3 - <<'PYEOF'
+          import os
+          from huggingface_hub import HfApi
+
+          api = HfApi(token=os.environ["HF_TOKEN"])
+          username = api.whoami()["name"]
+          repo_id = f'{username}/{os.environ["HF_SPACE_ID"]}'
+
+          api.create_repo(
+              repo_id=repo_id,
+              repo_type="space",
+              space_sdk="docker",
+              exist_ok=True,
+              private=False,
+          )
+          print(f"Space ready: https://huggingface.co/spaces/{repo_id}")
+
+          # Mirrors render.yaml's envVars list so the two hosts behave
+          # identically. All non-sensitive -- set as Space *variables*
+          # (visible in the Space's settings), not secrets.
+          variables = {
+              "ENVIRONMENT": "production",
+              "LOG_LEVEL": "INFO",
+              "API_V1_PREFIX": "/api/v1",
+              "STORAGE_DIR": "/app/storage",
+              "DATABASE_URL": "sqlite:////app/storage/voice_studio.db",
+              "HF_HOME": "/app/storage/hf-cache",
+              "VOICE_ENGINE": "chatterbox",
+              "CHATTERBOX_VARIANT": "turbo",
+              "DEVICE": "cpu",
+              "PRELOAD_MODEL": "false",
+              "MAX_UPLOAD_BYTES": "26214400",
+              "MAX_TEXT_CHARS": "2000",
+              "MAX_VOICES": "100",
+              "REQUIRE_CONSENT": "true",
+              "RATE_LIMIT_ENABLED": "true",
+              "ENABLE_EXPERIMENTAL_ARMENIAN": "true",
+          }
+          cors_origins = os.environ.get("CORS_ORIGINS", "").strip()
+          if cors_origins:
+              variables["CORS_ORIGINS"] = cors_origins
+          else:
+              print("::warning::CLOUDFLARE_PAGES_URL variable not set -- CORS_ORIGINS left "
+                    "unset on the Space, so the frontend will not be able to call this API "
+                    "yet. Set the CLOUDFLARE_PAGES_URL Actions variable and re-run.")
+
+          for key, value in variables.items():
+              api.add_space_variable(repo_id=repo_id, key=key, value=value)
+          print(f"Set {len(variables)} Space variables.")
+
+          api.upload_folder(
+              repo_id=repo_id,
+              repo_type="space",
+              folder_path="space_build",
+              commit_message=f"Deploy from {os.environ.get('GITHUB_SHA', 'unknown commit')}",
+          )
+          print("Upload complete -- the Space will rebuild now.")
+          PYEOF
