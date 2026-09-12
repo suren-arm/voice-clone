@@ -7,6 +7,10 @@ on:
         description: Backend base URL to check
         type: string
         default: https://voice-clone-2nhg.onrender.com
+      frontend_url:
+        description: Frontend base URL to check
+        type: string
+        default: https://ai-voice-studio-660.pages.dev
 
 jobs:
   check:
@@ -36,3 +40,21 @@ jobs:
         if: always()
         run: |
           curl -sS -m 20 "${{ inputs.url }}/api/v1/system/info" | head -c 2000 || true
+
+      - name: Confirm the Cloudflare production frontend serves the new /fairy-tale route
+        if: always()
+        run: |
+          url="${{ inputs.frontend_url }}/fairy-tale/"
+          status=$(curl -sS -o /tmp/fairytale.html -w '%{http_code}' -m 20 "$url" || echo "000")
+          echo "GET $url -> HTTP $status"
+          if [ "$status" != "200" ]; then
+            echo "::error::/fairy-tale did not return 200 on the production frontend"
+            exit 1
+          fi
+          if grep -qi "Create Fairy Tale" /tmp/fairytale.html; then
+            echo "Confirmed: production frontend serves the new Fairy Tale page."
+          else
+            echo "::error::/fairy-tale returned 200 but doesn't contain expected content"
+            cat /tmp/fairytale.html
+            exit 1
+          fi
