@@ -1,0 +1,47 @@
+name: Check backend health
+
+# On-demand health check for the deployed backend, dispatched from wherever
+# this repo's CI/CD is managed. Exists because neither the coding sandbox
+# that built this deployment nor its author can reach render.com directly
+# (network policy blocks it, same as api.cloudflare.com) -- this runs on a
+# GitHub Actions runner, which has normal internet access, so it can give a
+# real answer instead of a guess.
+
+on:
+  workflow_dispatch:
+    inputs:
+      url:
+        description: Backend base URL to check
+        type: string
+        default: https://voice-clone-api.onrender.com
+
+jobs:
+  check:
+    name: Health check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check /health
+        run: |
+          url="${{ inputs.url }}/health"
+          status=$(curl -sS -o /tmp/health.json -w '%{http_code}' -m 20 "$url" || echo "000")
+          echo "GET $url -> HTTP $status"
+          if [ "$status" = "000" ]; then
+            echo "::error::Could not reach $url at all (DNS/connection failure or timeout)"
+            exit 1
+          fi
+          echo "--- response body ---"
+          cat /tmp/health.json || true
+          echo ""
+          if [ "$status" != "200" ]; then
+            echo "::error::$url returned HTTP $status, not 200"
+            exit 1
+          fi
+
+      - name: Check /api/v1/system/info
+        run: |
+          url="${{ inputs.url }}/api/v1/system/info"
+          status=$(curl -sS -o /tmp/info.json -w '%{http_code}' -m 20 "$url" || echo "000")
+          echo "GET $url -> HTTP $status"
+          echo "--- response body ---"
+          cat /tmp/info.json || true
+          echo ""
