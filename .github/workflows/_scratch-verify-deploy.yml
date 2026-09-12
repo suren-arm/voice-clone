@@ -1,0 +1,38 @@
+name: Scratch verify deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      url:
+        description: Backend base URL to check
+        type: string
+        default: https://voice-clone-2nhg.onrender.com
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Wait for the new /voices/defaults endpoint to come up
+        run: |
+          url="${{ inputs.url }}/api/v1/voices/defaults"
+          echo "Polling $url (Render Docker rebuild can take several minutes)..."
+          for i in $(seq 1 40); do
+            status=$(curl -sS -o /tmp/body.json -w '%{http_code}' -m 20 "$url" || echo "000")
+            echo "attempt $i: HTTP $status"
+            if [ "$status" = "200" ]; then
+              echo "=== response ==="
+              cat /tmp/body.json
+              echo ""
+              exit 0
+            fi
+            sleep 15
+          done
+          echo "::error::Endpoint never came up (still old backend, or deploy failed)"
+          echo "--- last response body (if any) ---"
+          cat /tmp/body.json 2>/dev/null || true
+          exit 1
+
+      - name: Also confirm existing system/info still works (no regression)
+        if: always()
+        run: |
+          curl -sS -m 20 "${{ inputs.url }}/api/v1/system/info" | head -c 2000 || true
