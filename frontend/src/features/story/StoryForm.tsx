@@ -5,6 +5,7 @@ import { Button } from '@/components/Button';
 import { Callout } from '@/components/Callout';
 import { Card } from '@/components/Card';
 import { Field } from '@/components/Field';
+import { useAiProviders } from '@/hooks/useAiProviders';
 import { useDefaultVoices } from '@/hooks/useDefaultVoices';
 import { useToast } from '@/hooks/useToast';
 import { useVoices } from '@/hooks/useVoices';
@@ -12,6 +13,7 @@ import { ApiError } from '@/services/apiClient';
 import { generateSpeech } from '@/services/speech';
 import { generateStory } from '@/services/stories';
 import type {
+  AiProviderId,
   BackgroundSound,
   Generation,
   Story,
@@ -47,8 +49,10 @@ const TONE_OPTIONS: { value: StoryTone; label: string }[] = [
 export function StoryForm() {
   const { voices } = useVoices();
   const { defaultVoices } = useDefaultVoices();
+  const { info: aiProviders } = useAiProviders();
   const { push } = useToast();
 
+  const [provider, setProvider] = useState<AiProviderId>('auto');
   const [language, setLanguage] = useState<StoryLanguage>('en');
   const [characters, setCharacters] = useState('');
   const [idea, setIdea] = useState('');
@@ -84,7 +88,15 @@ export function StoryForm() {
     setStory(null);
     setNarration(null);
     try {
-      const result = await generateStory({ language, characters, idea, ageGroup, length, tone });
+      const result = await generateStory({
+        provider,
+        language,
+        characters,
+        idea,
+        ageGroup,
+        length,
+        tone,
+      });
       setStory(result);
       setStoryText(result.text);
       push('success', 'Story generated — read it over, then narrate it.');
@@ -138,6 +150,35 @@ export function StoryForm() {
         }
       >
         <div className="stack">
+          <Field
+            label="AI Provider"
+            hint={
+              provider === 'auto'
+                ? aiProviders?.autoResolvesTo
+                  ? `Auto currently uses ${aiProviders.providers.find((p) => p.id === aiProviders.autoResolvesTo)?.name ?? aiProviders.autoResolvesTo}.`
+                  : 'No AI provider is configured on this server yet.'
+                : undefined
+            }
+          >
+            {(props) => (
+              <select
+                {...props}
+                className="select"
+                value={provider}
+                onChange={(event) => setProvider(event.target.value)}
+                data-testid="ai-provider-select"
+              >
+                <option value="auto">Auto (recommended)</option>
+                {aiProviders?.providers.map((p) => (
+                  <option key={p.id} value={p.id} disabled={!p.available}>
+                    {p.name}
+                    {p.available ? '' : ' — Not configured'}
+                  </option>
+                ))}
+              </select>
+            )}
+          </Field>
+
           <Field label="Language">
             {(props) => (
               <select
@@ -259,7 +300,7 @@ export function StoryForm() {
       </Card>
 
       {story && (
-        <Card title={story.title} hint={`${story.wordCount} words`}>
+        <Card title={story.title} hint={`${story.wordCount} words · written by ${story.providerName}`}>
           <div className="stack">
             <Field label="Your story (edit freely before narrating)">
               {(props) => (

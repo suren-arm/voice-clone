@@ -128,7 +128,11 @@ export type StoryLength = 'short' | 'medium' | 'long';
 export type StoryAgeGroup = '3-5' | '6-8' | '9-12';
 export type StoryTone = 'magical' | 'funny' | 'adventure' | 'educational' | 'bedtime';
 
+/** "auto" plus any AiProvider.id the backend reports. */
+export type AiProviderId = string;
+
 export interface GenerateStoryInput {
+  provider: AiProviderId;
   language: StoryLanguage;
   characters: string;
   idea: string;
@@ -142,6 +146,20 @@ export interface Story {
   text: string;
   language: StoryLanguage;
   wordCount: number;
+  provider: string;
+  providerName: string;
+}
+
+export interface AiProvider {
+  id: AiProviderId;
+  name: string;
+  kind: 'paid' | 'free-tier' | 'local';
+  available: boolean;
+}
+
+export interface AiProvidersInfo {
+  providers: AiProvider[];
+  autoResolvesTo: AiProviderId | null;
 }
 
 /** Shape of the backend's error envelope. */

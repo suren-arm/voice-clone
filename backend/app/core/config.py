@@ -77,9 +77,33 @@ class Settings(BaseSettings):
     # -- experimental ------------------------------------------------------
     enable_experimental_armenian: bool = True
 
-    # -- fairy-tale generation (Anthropic Claude API) -----------------------
+    # -- fairy-tale generation: multi-provider AI text generation ----------
+    # None of these is mandatory -- StoryService works with any subset
+    # configured, via AiProviderRegistry (app/services/ai_providers/). Model
+    # defaults verified against each vendor's own current documentation/SDK
+    # at implementation time (12 September 2026); re-verify periodically,
+    # this space moves fast -- see README.md's "AI Providers" section.
+    openai_api_key: str | None = None
+    openai_model: str = "gpt-5.5"
+    gemini_api_key: str | None = None
+    gemini_model: str = "gemini-3.5-flash"
     anthropic_api_key: str | None = None
-    story_model: str = "claude-opus-5"
+    anthropic_model: str = "claude-opus-5"
+    # Self-hosted only -- see ai_providers/ollama_provider.py for why this
+    # cannot run inside the same container as Chatterbox on the deployed
+    # Render Starter instance.
+    ollama_base_url: str | None = None
+    ollama_model: str = "qwen2.5:7b"
+
+    # "auto" mode: try this provider first if it's configured, before
+    # falling through the built-in priority order. Unset = use the built-in
+    # order (openai, gemini, anthropic, ollama).
+    ai_preferred_provider: str | None = None
+    # "auto" mode: try free-tier/local providers before paid ones, so a
+    # deployment that has both a paid and a free provider configured
+    # doesn't default to spending money on every request.
+    ai_auto_prefer_free: bool = False
+
     rate_limit_story_per_hour: int = 30
 
     # -- validators --------------------------------------------------------

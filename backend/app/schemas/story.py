@@ -18,12 +18,21 @@ StoryTone = Literal["magical", "funny", "adventure", "educational", "bedtime"]
 
 
 class StoryRequest(ApiModel):
+    #: "auto" (default) lets the server pick any configured provider; an
+    #: explicit id (e.g. "openai") uses exactly that provider or reports it
+    #: unavailable -- see AiProviderRegistry.resolve.
+    provider: str = Field(default="auto", max_length=32)
     language: StoryLanguage = "en"
     characters: str = Field(min_length=1, max_length=300)
     idea: str = Field(min_length=1, max_length=1000)
     age_group: StoryAgeGroup = "6-8"
     length: StoryLength = "medium"
     tone: StoryTone = "magical"
+
+    @field_validator("provider")
+    @classmethod
+    def _lower(cls, value: str) -> str:
+        return value.strip().lower()
 
     @field_validator("characters", "idea")
     @classmethod
@@ -39,3 +48,7 @@ class StoryResponse(ApiModel):
     text: str
     language: StoryLanguage
     word_count: int
+    #: Which provider actually generated this story -- useful when the
+    #: request asked for "auto".
+    provider: str
+    provider_name: str

@@ -113,12 +113,33 @@ services:
       - key: ENABLE_EXPERIMENTAL_ARMENIAN
         value: "true"
 
-      # Required for "Create Fairy Tale"; every other feature works without
-      # it. A secret, so sync: false -- set the real key in the Render
-      # dashboard's Environment tab, never in this file.
+      # "Create Fairy Tale" is provider-independent (see
+      # backend/app/services/ai_providers/ and README.md's AI Providers section): every
+      # key below is optional and independent, none is mandatory, and every
+      # other feature works with all four unset. Set at least one of the four
+      # *_API_KEY / OLLAMA_BASE_URL values in the Render dashboard's
+      # Environment tab for story generation to actually work -- they are
+      # secrets, so sync: false, never a literal value in this file. Gemini's
+      # free tier (a Google AI Studio key, no billing account needed) is the
+      # cheapest way to get one working -- see README.md's AI Providers section.
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: OPENAI_MODEL
+        value: gpt-5.5
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: GEMINI_MODEL
+        value: gemini-3.5-flash
       - key: ANTHROPIC_API_KEY
         sync: false
-      - key: STORY_MODEL
+      - key: ANTHROPIC_MODEL
         value: claude-opus-5
+      # Ollama needs its own server -- not viable inside this container
+      # alongside Chatterbox on the Starter plan (see README.md). Left unset
+      # here; point it at a self-hosted Ollama instance if you have one.
+      - key: OLLAMA_BASE_URL
+        sync: false
+      - key: OLLAMA_MODEL
+        value: qwen2.5:7b
       - key: RATE_LIMIT_STORY_PER_HOUR
         value: "30"

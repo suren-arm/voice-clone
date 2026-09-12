@@ -4,9 +4,10 @@ Open-source voice cloning and story narration as a web application. Clone
 your own voice from a 10–30 second recording, or skip that entirely and use a
 built-in default voice. Write text or generate an original fairy tale in
 English or Armenian, then narrate it — optionally with a background ambience
-mixed under the narration. Everything runs on your own backend; the only
-third-party call is to the Anthropic API, and only for fairy-tale text
-generation.
+mixed under the narration. Everything runs on your own backend; fairy-tale
+text generation is the only feature that calls a third-party API, and it
+supports **four interchangeable providers** so no single AI vendor is
+required — see [AI Providers](#ai-providers).
 
 **Voice cloning model:** [Chatterbox Multilingual V3](https://github.com/resemble-ai/chatterbox)
 by Resemble AI — MIT-licensed **code *and* weights**, 23 languages, zero-shot
@@ -17,15 +18,18 @@ cloning from ~10 seconds of audio, neural watermarking built in.
 native English and Armenian synthesis, no recording required, honestly
 labelled "Classic" quality rather than passed off as natural neural speech.
 
-**Story generation:** [Claude](https://www.anthropic.com/claude) (Opus 5) via
-the Anthropic API — generates fairy tales natively in the target language.
+**Story generation:** any of OpenAI, Google Gemini, Anthropic Claude, or a
+self-hosted Ollama model — see [AI Providers](#ai-providers) for how the
+provider abstraction works and which is used when.
 
 ```
                                         ┌─▶ VoiceCloningEngine ─▶ PyTorch (CUDA/CPU/MPS)
 Browser ──HTTPS──▶ FastAPI ──┬─ speech ─┤
  record/type         REST    │          └─▶ espeak-ng (default voices, en + hy)
  playback                    │                    │
-                              └─ stories ─▶ Anthropic API (Claude)
+                              └─ stories ─▶ StoryService ─▶ AiProviderRegistry
+                                                                  │
+                                              OpenAI · Gemini · Claude · Ollama
                                                    │
                                      ffmpeg mixes narration + ambience
                                                    │
@@ -39,6 +43,7 @@ Browser ──HTTPS──▶ FastAPI ──┬─ speech ─┤
 - [Features](#features)
 - [Screenshots](#screenshots)
 - [Why this model](#why-this-model)
+- [AI Providers](#ai-providers)
 - [Armenian](#armenian)
 - [Quick start](#quick-start)
 - [Local development](#local-development)
@@ -137,6 +142,74 @@ speaker representation, and PerTh watermarking in the box — which
 streaming for a live voice agent. Swapping either in means one new file in
 `ai/` and one environment variable — see
 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md#adding-another-model).
+
+---
+
+## AI Providers
+
+Fairy-tale text generation is **provider-independent** — it depends on an
+abstraction (`AiTextProvider`, in `backend/app/services/ai_providers/`), never
+on a specific vendor's SDK. No single AI company is required: with none of
+the four configured, every other feature (cloning, TTS, playback, background
+mixing) still works, and story generation returns a clear "not configured"
+error instead of failing on a hardcoded provider.
+
+| Provider | Env var(s) | Kind | Notes |
+|---|---|---|---|
+| **OpenAI** | `OPENAI_API_KEY` (+ `OPENAI_MODEL`, default `gpt-5.5`) | paid | Needs a billing-enabled account |
+| **Google Gemini** | `GEMINI_API_KEY` (+ `GEMINI_MODEL`, default `gemini-3.5-flash`) | **free-tier** | A Google AI Studio key is free, no billing account or card required, on Flash-class models (rate-limited) — verified 12 Sept 2026, re-check before relying on it, free tiers change |
+| **Anthropic Claude** | `ANTHROPIC_API_KEY` (+ `ANTHROPIC_MODEL`, default `claude-opus-5`) | paid | Optional, like every other provider — no longer mandatory |
+| **Ollama (local)** | `OLLAMA_BASE_URL` (+ `OLLAMA_MODEL`, default `qwen2.5:7b`) | **local** | The genuinely no-vendor-cost option — see below |
+
+Model defaults were verified against each vendor's own current SDK/docs at
+implementation time (12 September 2026) rather than assumed from memory —
+this space moves fast, so re-verify before changing them blind.
+
+### Provider selection
+
+`GET /api/v1/ai/providers` reports id/name/kind/availability for all four
+(never a key) so the frontend's "AI Provider" dropdown on the Create Fairy
+Tale screen only ever offers what is actually configured — an unconfigured
+provider is shown disabled ("Not configured"), not selectable, so a user can
+never pick a provider and then hit an infrastructure error.
+
+`StoryRequest.provider` is `"auto"` by default, or an exact provider id:
+
+- **An exact id** (`"openai"`, `"gemini"`, `"anthropic"`, `"ollama"`) is used
+  exactly as asked, or the request fails with a clear error — it never
+  silently substitutes a different provider. Picking OpenAI and being billed
+  on Anthropic instead would be a genuinely bad surprise.
+- **`"auto"`** tries, in order: `AI_PREFERRED_PROVIDER` if set and available,
+  then the built-in priority (`openai` → `gemini` → `anthropic` → `ollama`),
+  or — if `AI_AUTO_PREFER_FREE=true` — free-tier/local providers before paid
+  ones. This is the only mode allowed to move between providers.
+
+### Why Ollama for the free/local option
+
+A genuinely free option needs to run somewhere with no per-token vendor fee.
+Self-hosting an LLM **inside this app's own backend container** was
+considered and rejected: the deployed Render Starter instance already runs
+Chatterbox (multiple hundred MB of loaded model + PyTorch), and even a small
+open model (Qwen2.5, Llama 3.2, Gemma) needs several more GB of RAM alongside
+it — not realistic on that plan without either upgrading it or starving
+Chatterbox. Ollama is implemented as a real, working provider
+(`ollama_provider.py`, talking to Ollama's own REST API) that activates the
+moment `OLLAMA_BASE_URL` points at a real Ollama server — your own machine in
+development, or a self-hosted box with more RAM in production. That is what
+makes it the "no mandatory paid API key, ever" answer: cost is whatever you
+already pay to run that server, not a per-request vendor fee.
+
+Model choice, if you do self-host: `qwen2.5:7b` is the default (broader
+multilingual training coverage than similarly-sized Llama/Gemma models,
+which matters for Armenian quality) for a host with a few GB of RAM to spare;
+`qwen2.5:3b` is a lighter, faster alternative for a more constrained host, at
+some quality cost. Neither has been benchmarked here for Armenian output
+quality specifically — verify before relying on it for that language, same
+standard applied to every other Armenian claim in this README.
+
+Gemini's free tier (see table above) is this deployment's practical
+"no-cost-to-try" path today, since it needs no infrastructure of your own —
+Ollama remains the answer for "no vendor at all, ever."
 
 ---
 
@@ -341,9 +414,17 @@ Full list with comments in [`.env.example`](.env.example). The ones that matter:
 | `RATE_LIMIT_ENABLED` | `true` | |
 | `ENABLE_EXPERIMENTAL_ARMENIAN` | `true` | API-only; the UI never exposes cloned+Armenian regardless |
 | `DATABASE_URL` | `sqlite:///storage/voice_studio.db` | Any SQLAlchemy URL |
-| `ANTHROPIC_API_KEY` | unset | Required for "Create Fairy Tale"; unset disables just that feature |
-| `STORY_MODEL` | `claude-opus-5` | |
+| `OPENAI_API_KEY` / `OPENAI_MODEL` | unset / `gpt-5.5` | See [AI Providers](#ai-providers) |
+| `GEMINI_API_KEY` / `GEMINI_MODEL` | unset / `gemini-3.5-flash` | Free tier, no billing account needed |
+| `ANTHROPIC_API_KEY` / `ANTHROPIC_MODEL` | unset / `claude-opus-5` | Optional, not mandatory |
+| `OLLAMA_BASE_URL` / `OLLAMA_MODEL` | unset / `qwen2.5:7b` | Self-hosted; the no-vendor-cost option |
+| `AI_PREFERRED_PROVIDER` | unset | "auto" mode tries this provider first if configured |
+| `AI_AUTO_PREFER_FREE` | `false` | "auto" mode tries free-tier/local providers before paid ones |
 | `RATE_LIMIT_STORY_PER_HOUR` | `30` | |
+
+None of the four AI provider variables is individually required — "Create
+Fairy Tale" works with any subset configured (including zero, where it
+returns a clear "not configured" error instead of breaking).
 
 ---
 
@@ -421,7 +502,9 @@ GET    /api/v1/generations/{id}             get one
 GET    /api/v1/generations/{id}/audio       stream (Range) or ?download=true
 DELETE /api/v1/generations/{id}             delete
 
-POST   /api/v1/stories/generate             generate a fairy tale (English or Armenian)
+POST   /api/v1/stories/generate             generate a fairy tale (English or Armenian,
+                                             provider: "auto" or an exact provider id)
+GET    /api/v1/ai/providers                 which AI providers are configured (never a key)
 
 GET    /api/v1/system/info                  engine, languages, limits
 GET    /health                              liveness
@@ -445,7 +528,7 @@ wordCount}`. Narrating the result — or any manually-typed text — is the same
 ## Testing
 
 ```bash
-# Backend — 153 tests, mock engine + real espeak-ng, no torch weights, ~16 s
+# Backend — 191 tests, mock engine + real espeak-ng, no torch weights, ~18 s
 cd backend && pytest
 
 # By layer
@@ -556,9 +639,12 @@ Three things to get right, wherever you deploy: `NEXT_PUBLIC_API_URL` is
 compiled into the frontend bundle at build time (changing it needs a rebuild),
 `CORS_ORIGINS` on the backend must list the frontend's exact origin, set
 *after* the frontend's first deploy since that's when the URL is assigned, and
-`ANTHROPIC_API_KEY` must be set on the backend host (Render environment
-variable, not a build-time/frontend value) for "Create Fairy Tale" to work —
-every other feature works without it.
+**at least one** of `OPENAI_API_KEY` / `GEMINI_API_KEY` / `ANTHROPIC_API_KEY` /
+`OLLAMA_BASE_URL` must be set on the backend host (Render environment
+variables, not build-time/frontend values) for "Create Fairy Tale" to
+actually generate a story — every other feature works without any of them.
+Gemini's free tier (see [AI Providers](#ai-providers)) is the cheapest way to
+get that one working: a Google AI Studio key, free, no card required.
 **HTTPS is mandatory** — `getUserMedia` refuses to run outside a secure
 context, so microphone recording simply will not work over plain HTTP. Both
 platforms provide HTTPS by default on their `*.pages.dev` / `*.onrender.com`

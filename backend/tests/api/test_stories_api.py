@@ -24,6 +24,24 @@ def test_story_generation_without_api_key_is_503(client):
     response = client.post("/api/v1/stories/generate", json=_story_payload())
     assert response.status_code == 503
     assert response.json()["error"]["code"] == "story_service_unavailable"
+    # The message must be useful and provider-neutral, not the old
+    # single-provider "ANTHROPIC_API_KEY is not set" leak.
+    assert "provider" in response.json()["error"]["message"].lower()
+
+
+def test_explicit_unconfigured_provider_is_503_not_a_silent_fallback(client):
+    response = client.post(
+        "/api/v1/stories/generate", json=_story_payload(provider="openai")
+    )
+    assert response.status_code == 503
+    assert "OpenAI" in response.json()["error"]["message"]
+
+
+def test_unknown_provider_id_is_503(client):
+    response = client.post(
+        "/api/v1/stories/generate", json=_story_payload(provider="not-a-real-provider")
+    )
+    assert response.status_code == 503
 
 
 def test_story_request_accepts_armenian_language(client, settings, monkeypatch):

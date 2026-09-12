@@ -13,6 +13,7 @@ from ai.registry import get_engine as get_engine_singleton
 from app.core.config import Settings, get_settings
 from app.core.rate_limit import RateLimiter, client_key
 from app.db.session import get_session_factory
+from app.services.ai_providers import AiProviderRegistry, build_default_registry
 from app.services.speech_service import SpeechService
 from app.services.storage import LocalStorage
 from app.services.story_service import StoryService
@@ -68,8 +69,15 @@ def speech_service(
     return SpeechService(session=session, settings=settings, engine=engine, storage=storage)
 
 
-def story_service(settings: SettingsDep) -> StoryService:
-    return StoryService(settings=settings)
+def ai_provider_registry(settings: SettingsDep) -> AiProviderRegistry:
+    return build_default_registry(settings)
+
+
+AiProviderRegistryDep = Annotated[AiProviderRegistry, Depends(ai_provider_registry)]
+
+
+def story_service(registry: AiProviderRegistryDep) -> StoryService:
+    return StoryService(registry=registry)
 
 
 VoiceServiceDep = Annotated[VoiceService, Depends(voice_service)]
