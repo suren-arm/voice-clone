@@ -8,13 +8,24 @@ never depend on an external site's uptime or content.
 
 from __future__ import annotations
 
+import pytest
+
 import app.services.documents.web_extractor as web_extractor_module
 from app.services.documents.security import FetchedResource
 
 
 def _default_voice(client, language="en"):
+    """The built-in voice for ``language``, or a clear skip if espeak-ng is absent.
+
+    Default voices are bootstrapped from espeak-ng at startup, so a host
+    without it has none -- skip with a readable reason rather than letting
+    ``next()`` raise a bare StopIteration that says nothing about why.
+    """
     defaults = client.get("/api/v1/voices/defaults").json()
-    return next(v for v in defaults if v["language"] == language)
+    voice = next((v for v in defaults if v["language"] == language), None)
+    if voice is None:
+        pytest.skip(f"no built-in {language} default voice (espeak-ng not installed?)")
+    return voice
 
 
 # -- PDF upload ---------------------------------------------------------------

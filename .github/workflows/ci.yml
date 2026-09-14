@@ -33,8 +33,14 @@ jobs:
           cache: pip
           cache-dependency-path: backend/requirements-ci.txt
 
-      - name: Install ffmpeg
-        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends ffmpeg libsndfile1
+      - name: Install ffmpeg and espeak-ng
+        # Must match backend/Dockerfile.render's system packages: espeak-ng
+        # powers the built-in default voices, so without it the startup
+        # bootstrap creates none and every default-voice test either skips
+        # (tests/unit/test_espeak_engine.py) or fails looking one up
+        # (tests/api/test_books_api.py). CI silently drifting from the
+        # production image is how that goes unnoticed.
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends ffmpeg libsndfile1 espeak-ng
 
       - name: Install dependencies
         # requirements-ci.txt deliberately omits chatterbox-tts (and torch).
