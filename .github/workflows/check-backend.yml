@@ -14,22 +14,51 @@ on:
         description: Backend base URL to check
         type: string
         default: https://voice-clone.onrender.com
+      timeout_seconds:
+        description: Per-request timeout. Raise it if a cold start is suspected.
+        type: string
+        default: '240'
 
 jobs:
   check:
     name: Health check
     runs-on: ubuntu-latest
     steps:
+      - name: Diagnose reachability
+        # Run before the health check so a failure below can be attributed.
+        # "curl timed out" alone cannot tell apart DNS failure, a refused
+        # connection, a TLS problem and an instance that accepts the
+        # connection but never answers -- which are four different bugs with
+        # four different fixes. This separates them.
+        run: |
+          host=$(echo "${{ inputs.url }}" | sed -E 's#^https?://##; s#/.*##')
+          echo "::group::DNS"
+          getent hosts "$host" || echo "DNS: no A/AAAA record for $host"
+          echo "::endgroup::"
+
+          echo "::group::TCP + TLS handshake (10s budget)"
+          if curl -sS -o /dev/null -m 10 --connect-timeout 10 \
+               -w 'dns=%{time_namelookup}s connect=%{time_connect}s tls=%{time_appconnect}s\n' \
+               "https://$host/" 2>&1; then
+            echo "Handshake completed and a response arrived within 10s."
+          else
+            echo "No response body within 10s. If dns/connect/tls above are all"
+            echo "non-zero, the instance is accepting connections but not"
+            echo "answering -- that points at the app, not the network."
+          fi
+          echo "::endgroup::"
+
       - name: Check /health
-        # Render's free tier spins down on idle and can take 50s+ to wake for
-        # the first request after that -- give it real room rather than
-        # reporting a cold start as "unreachable".
+        # Render spins down on idle, and this image is large (torch), so a
+        # cold start can run well past a minute. Give it real room rather
+        # than reporting a slow wake as "unreachable".
         run: |
           url="${{ inputs.url }}/health"
-          status=$(curl -sS -o /tmp/health.json -w '%{http_code}' -m 90 "$url" || echo "000")
-          echo "GET $url -> HTTP $status"
+          t="${{ inputs.timeout_seconds }}"
+          status=$(curl -sS -o /tmp/health.json -w '%{http_code}' -m "$t" "$url" || echo "000")
+          echo "GET $url -> HTTP $status (timeout ${t}s)"
           if [ "$status" = "000" ]; then
-            echo "::error::Could not reach $url at all (DNS/connection failure or timeout)"
+            echo "::error::Could not reach $url at all (DNS/connection failure or timeout after ${t}s)"
             exit 1
           fi
           echo "--- response body ---"
@@ -43,7 +72,8 @@ jobs:
       - name: Check /api/v1/system/info
         run: |
           url="${{ inputs.url }}/api/v1/system/info"
-          status=$(curl -sS -o /tmp/info.json -w '%{http_code}' -m 90 "$url" || echo "000")
+          t="${{ inputs.timeout_seconds }}"
+          status=$(curl -sS -o /tmp/info.json -w '%{http_code}' -m "$t" "$url" || echo "000")
           echo "GET $url -> HTTP $status"
           echo "--- response body ---"
           cat /tmp/info.json || true
