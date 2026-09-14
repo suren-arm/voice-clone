@@ -34,3 +34,9 @@ pytest==9.0.2
 pytest-cov==7.0.0
 httpx==0.28.1
 ruff==0.15.4
+# Test-fixture generation only (tests/conftest.py builds real PDFs, including
+# genuine Armenian Unicode text, rather than hand-crafting PDF byte streams).
+# Needed here as well as in requirements-dev.txt: CI installs *only* this file,
+# and tests/unit/test_pdf_extractor.py + tests/api/test_books_api.py import the
+# fixtures at collection time.
+fpdf2==2.8.2
