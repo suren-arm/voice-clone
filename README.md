@@ -102,8 +102,12 @@ Browser ──HTTPS──▶ FastAPI ──┼─ stories ─▶ StoryService �
 - **Background ambience.** Optional, mixed under the narration via ffmpeg —
   *None*, *Mystical*, *Calm*, *Forest* and *Bedtime* (all self-generated,
   license-free synth pads; see `scripts/generate_ambience.py`). The narration
-  always stays louder and clearer than the background, whatever the volume
-  slider is set to.
+  stays clear over any of them, guarded three ways: every track keeps its
+  energy out of the 150 Hz–5 kHz speech corridor (enforced at generation time
+  *and* by `tests/unit/test_ambience_speech_safety.py`), the mix ducks the
+  ambience under speech with a sidechain compressor, and the background gain
+  is capped regardless of the slider. Measured: mixing moves the narration's
+  speech-band energy by about 0.1%.
 - **Long-text-safe narration.** Fairy tales and books are chunked at
   paragraph/sentence boundaries — never mid-word — synthesized per chunk, and
   concatenated, so a long text doesn't risk a single giant, fragile TTS call.
@@ -112,22 +116,40 @@ Browser ──HTTPS──▶ FastAPI ──┼─ stories ─▶ StoryService �
 
 ### Support matrix
 
-| | English | Armenian |
-|---|---|---|
-| Manual text input | ✅ | ✅ |
-| Fairy-tale generation | ✅ (native) | ✅ (native, not translated) |
-| Default-voice TTS | ✅ (espeak-ng) | ✅ (espeak-ng, native phonetics) |
-| Voice cloning (create a voice) | ✅ | ⚠️ experimental only ([docs/ARMENIAN.md](docs/ARMENIAN.md)) |
-| Cloned-voice TTS | ✅ | ❌ disabled in the UI — see [Armenian](#armenian) |
-| Background ambience | ✅ (5 tracks) | ✅ (5 tracks) |
-| Book Reader — PDF extraction | ✅ | ✅ (verified: real Armenian Unicode, no mojibake) |
-| Book Reader — web article extraction | ✅ | ✅ |
-| Book Reader — narration | ✅ (cloned or default) | ✅ (default only, same rule as above) |
+**Supported languages — the same three everywhere:** 🇬🇧 English (`en`),
+🇦🇲 Հայերեն / Armenian (`hy`), 🇷🇺 Русский / Russian (`ru`).
+
+| | English | Հայերեն | Русский |
+|---|---|---|---|
+| Text to Speech | ✅ | ✅ | ✅ |
+| Fairy-tale generation | ✅ (native) | ✅ (native, not translated) | ✅ (native, not translated) |
+| Fairy-tale narration | ✅ | ✅ | ✅ |
+| Default ("studio") voice | ✅ espeak-ng `en-us` | ✅ espeak-ng `hy` + `hyw` | ✅ espeak-ng `ru` |
+| Cloned voice ("My Voice") | ✅ | ❌ model cannot speak it | ⚠️ multilingual variant only |
+| Background ambience | ✅ (5 options) | ✅ | ✅ |
+| Book Reader — PDF extraction | ✅ | ✅ (real Unicode, no mojibake) | ✅ (Cyrillic verified) |
+| Book Reader — web article extraction | ✅ | ✅ | ✅ |
+| Book Reader — narration | ✅ | ✅ (studio voice) | ✅ (studio voice) |
 
 "✅" means genuinely supported and tested, not merely accepted by the API.
-Nothing in this table is marked supported based on what a model claims to do —
-see [Armenian](#armenian) and [docs/ARMENIAN.md](docs/ARMENIAN.md) for what was
-actually verified and why the one ❌ exists.
+
+**Cloned-voice limitations are real, not policy.** Voice *cloning* and
+*speaking a language in a cloned voice* are different capabilities:
+
+- **English** — cloneable and speakable in every Chatterbox variant.
+- **Armenian** — no open-source zero-shot cloning model supports it (verified;
+  see [docs/ARMENIAN.md](docs/ARMENIAN.md)). The studio voices speak it
+  natively, so the UI disables the cloned path and says
+  *"This voice cannot speak Հայերեն. Please choose another voice."*
+- **Russian** — in Chatterbox's `multilingual` variant only. The deployed
+  configuration is `turbo`, which is English-only, so on production Russian
+  narration uses the studio voice.
+
+None of this is hardcoded in the UI. `GET /api/v1/system/info` publishes a
+`supportsClonedVoice` / `supportsDefaultVoice` flag per language, read off the
+engines actually loaded, and the voice picker only ever offers voices that
+speak the chosen language — so an unsupported combination cannot be selected,
+let alone submitted.
 
 ---
 
@@ -260,12 +282,14 @@ Two separate questions, two separate answers:
 > combination with an explanation, rather than allowing a request through to
 > an obscure backend error.
 >
-> **An experimental cloned-voice approximation exists behind a flag, for the
-> raw API only.** Armenian script can be transliterated into Russian
-> orthography (a much closer phonological fit than Latin) and spoken in your
-> cloned voice via `POST /api/v1/speech`. It is labelled experimental in the
-> API and on the stored record, but the Voice Story Studio UI does not expose
-> it — see the reasoning above.
+> **The transliteration bridge is no longer in the speech path.** Armenian
+> script can be transliterated into Russian orthography (a much closer
+> phonological fit than Latin) so a cloned voice can approximate it, and
+> `POST /api/v1/speech` used to do exactly that behind a flag. It was removed:
+> the studio voices speak Armenian natively, so the approximation was strictly
+> worse than the supported path while still being reachable. The
+> transliteration itself remains in `ai/armenian.py` as the documented starting
+> point for a fine-tuning pipeline — see [docs/ARMENIAN.md](docs/ARMENIAN.md).
 
 Expect a recognisable Armenian accent with wrong stress placement from the
 experimental path — not real Armenian TTS. What was verified for both
@@ -858,7 +882,7 @@ See [Book Reader](#book-reader).
 ## Testing
 
 ```bash
-# Backend — 274 tests, mock engine + real espeak-ng, no torch weights, ~30 s
+# Backend — 302 tests, mock engine + real espeak-ng, no torch weights, ~30 s
 cd backend && pytest
 
 # By layer
@@ -867,7 +891,7 @@ pytest tests/unit tests/api tests/integration
 # Real cloning model — opt-in, downloads weights
 pytest -m ai tests/ai
 
-# Frontend — 71 unit tests
+# Frontend — 77 unit tests
 cd frontend && npm run test:run
 
 # End-to-end — 16 tests, desktop + mobile viewports
@@ -883,7 +907,7 @@ npm run test:e2e
 | `frontend` (Vitest) | Formatting, file validation, the API client's error handling, the audio player, the dropzone, the generate form, the Book Reader form (upload, URL load, reading-range selection, narration, Armenian blocking, resume) |
 | `e2e` (Playwright) | Create → generate → play → download → delete, real `MediaRecorder` capture, the Armenian labelling path, API-failure handling, phone-width layout, Book Reader upload/URL/preset flow |
 
-Total: **361 tests** across four layers.
+Total: **395 tests** across four layers.
 
 CI never loads a model: `requirements-ci.txt` omits torch entirely and
 everything runs against `MockEngine`. The real-model suite is a separate,
