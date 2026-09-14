@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ToastProvider } from '@/hooks/useToast';
@@ -131,6 +131,18 @@ describe('BookReaderForm', () => {
     expect(screen.getByTestId('preview-text')).toHaveTextContent(
       'Once upon a time, a fox and a rabbit became friends.',
     );
+  });
+
+  it('accepts a PDF dropped onto the dropzone, not just one picked via the dialog', async () => {
+    renderForm();
+    const file = pdfFile();
+    fireEvent.drop(screen.getByTestId('book-dropzone'), {
+      dataTransfer: { files: [file], types: ['Files'] },
+    });
+
+    expect(await screen.findByText(/story\.pdf/)).toBeInTheDocument();
+    await userEvent.click(screen.getByTestId('load-book-submit'));
+    expect(await screen.findByRole('heading', { name: 'Chapter One' })).toBeInTheDocument();
   });
 
   it('loads a book from a URL', async () => {

@@ -19,12 +19,16 @@ export function isClonedVoiceBlockedForLanguage(language: string): boolean {
   return language.toLowerCase() === ARMENIAN_LANGUAGE_CODE;
 }
 
+/**
+ * A child picking "Mystical" from a row of words has no idea what it will
+ * sound like, so each option carries a picture of the place it evokes.
+ */
 export const BACKGROUND_SOUND_OPTIONS: { value: BackgroundSound; label: string }[] = [
-  { value: 'none', label: 'None' },
-  { value: 'mystical', label: 'Mystical' },
-  { value: 'calm', label: 'Calm' },
-  { value: 'forest', label: 'Forest' },
-  { value: 'bedtime', label: 'Bedtime' },
+  { value: 'none', label: '🔇 Just the voice' },
+  { value: 'mystical', label: '🔮 Magical' },
+  { value: 'calm', label: '🌊 Calm' },
+  { value: 'forest', label: '🌳 Forest' },
+  { value: 'bedtime', label: '🌙 Bedtime' },
 ];
 
 export const DEFAULT_BACKGROUND_VOLUME = 15;

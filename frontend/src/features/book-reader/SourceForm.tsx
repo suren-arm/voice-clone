@@ -3,10 +3,12 @@
 import { useState } from 'react';
 import { Button } from '@/components/Button';
 import { Callout } from '@/components/Callout';
+import { Dropzone } from '@/components/Dropzone';
 import { Field } from '@/components/Field';
 import { ApiError } from '@/services/apiClient';
 import { createBookFromUrl, uploadBookPdf } from '@/services/books';
 import type { BookDocument } from '@/types';
+import { formatBytes } from '@/utils/format';
 
 type SourceMode = 'upload' | 'url';
 
@@ -74,20 +76,29 @@ export function SourceForm({ onLoaded }: SourceFormProps) {
         )}
       </Field>
 
-      {mode === 'upload' && (
-        <Field label="Choose your book" hint="Pick a PDF from this device.">
-          {(props) => (
-            <input
-              {...props}
-              type="file"
-              className="input"
-              accept="application/pdf,.pdf"
-              onChange={(event) => setFile(event.target.files?.[0] ?? null)}
-              data-testid="book-pdf-input"
-            />
-          )}
-        </Field>
-      )}
+      {mode === 'upload' &&
+        (file ? (
+          <div className="row row--between">
+            <span className="field__hint">
+              <span aria-hidden="true">📄</span> {file.name} · {formatBytes(file.size)}
+            </span>
+            <Button variant="secondary" onClick={() => setFile(null)} data-testid="choose-different-book">
+              Choose a different book
+            </Button>
+          </div>
+        ) : (
+          <Dropzone
+            accept="application/pdf,.pdf"
+            icon="📄"
+            title="Drop your book here, or click to choose one"
+            hint="A PDF from this device."
+            inputLabel="PDF file"
+            onFile={setFile}
+            disabled={loading}
+            zoneTestId="book-dropzone"
+            inputTestId="book-pdf-input"
+          />
+        ))}
 
       {mode === 'url' && (
         <Field

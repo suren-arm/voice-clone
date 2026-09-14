@@ -2,11 +2,11 @@
 
 /** Click-or-drag file picker with client-side pre-validation. */
 
-import { useCallback, useRef, useState } from 'react';
-import type { DragEvent } from 'react';
+import { useCallback, useState } from 'react';
 import { AudioPlayer } from '@/components/AudioPlayer';
 import { Button } from '@/components/Button';
 import { Callout } from '@/components/Callout';
+import { Dropzone } from '@/components/Dropzone';
 import { ACCEPTED_EXTENSIONS, ACCEPT_ATTRIBUTE, probeDuration, validateAudioFile } from '@/utils/audio';
 import { formatBytes, formatDuration } from '@/utils/format';
 
@@ -22,10 +22,8 @@ interface AudioDropzoneProps {
 }
 
 export function AudioDropzone({ maxBytes, onFileChange }: AudioDropzoneProps) {
-  const inputRef = useRef<HTMLInputElement | null>(null);
   const [selection, setSelection] = useState<SelectedFile | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [dragOver, setDragOver] = useState(false);
 
   const clear = useCallback(() => {
     setSelection((current) => {
@@ -33,13 +31,11 @@ export function AudioDropzone({ maxBytes, onFileChange }: AudioDropzoneProps) {
       return null;
     });
     setError(null);
-    if (inputRef.current) inputRef.current.value = '';
     onFileChange(null);
   }, [onFileChange]);
 
   const accept = useCallback(
-    async (file: File | undefined) => {
-      if (!file) return;
+    async (file: File) => {
       const result = validateAudioFile(file, { maxBytes });
       if (!result.ok) {
         setError(result.error ?? 'That file cannot be used.');
@@ -67,12 +63,6 @@ export function AudioDropzone({ maxBytes, onFileChange }: AudioDropzoneProps) {
     [maxBytes, onFileChange],
   );
 
-  const onDrop = (event: DragEvent<HTMLDivElement>) => {
-    event.preventDefault();
-    setDragOver(false);
-    void accept(event.dataTransfer.files?.[0]);
-  };
-
   if (selection) {
     return (
       <div className="stack">
@@ -97,45 +87,15 @@ export function AudioDropzone({ maxBytes, onFileChange }: AudioDropzoneProps) {
 
   return (
     <div className="stack">
-      {/* The whole zone is a button so keyboard and pointer users get the same
-          affordance; the input itself stays visually hidden. */}
-      <div
-        className={dragOver ? 'dropzone dropzone--over' : 'dropzone'}
-        role="button"
-        tabIndex={0}
-        onClick={() => inputRef.current?.click()}
-        onKeyDown={(event) => {
-          if (event.key === 'Enter' || event.key === ' ') {
-            event.preventDefault();
-            inputRef.current?.click();
-          }
-        }}
-        onDragOver={(event) => {
-          event.preventDefault();
-          setDragOver(true);
-        }}
-        onDragLeave={() => setDragOver(false)}
-        onDrop={onDrop}
-        data-testid="dropzone"
-      >
-        <span className="dropzone__icon" aria-hidden="true">
-          ⬆
-        </span>
-        <span className="dropzone__title">Drop an audio file, or click to browse</span>
-        <span className="dropzone__hint">
-          {ACCEPTED_EXTENSIONS.map((ext) => ext.replace('.', '').toUpperCase()).join(', ')} · up to{' '}
-          {formatBytes(maxBytes)}
-        </span>
-      </div>
-
-      <input
-        ref={inputRef}
-        type="file"
+      <Dropzone
         accept={ACCEPT_ATTRIBUTE}
-        className="sr-only"
-        aria-label="Audio file"
-        onChange={(event) => void accept(event.target.files?.[0])}
-        data-testid="file-input"
+        icon="🎧"
+        title="Drop a sound file here, or click to choose one"
+        hint={`${ACCEPTED_EXTENSIONS.map((ext) => ext.replace('.', '').toUpperCase()).join(', ')} · up to ${formatBytes(maxBytes)}`}
+        inputLabel="Audio file"
+        onFile={(file) => void accept(file)}
+        zoneTestId="dropzone"
+        inputTestId="file-input"
       />
 
       {error && <Callout kind="error">{error}</Callout>}
