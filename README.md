@@ -883,7 +883,7 @@ npm run test:e2e
 | `frontend` (Vitest) | Formatting, file validation, the API client's error handling, the audio player, the dropzone, the generate form, the Book Reader form (upload, URL load, reading-range selection, narration, Armenian blocking, resume) |
 | `e2e` (Playwright) | Create → generate → play → download → delete, real `MediaRecorder` capture, the Armenian labelling path, API-failure handling, phone-width layout, Book Reader upload/URL/preset flow |
 
-Total: **359 tests** across four layers.
+Total: **361 tests** across four layers.
 
 CI never loads a model: `requirements-ci.txt` omits torch entirely and
 everything runs against `MockEngine`. The real-model suite is a separate,

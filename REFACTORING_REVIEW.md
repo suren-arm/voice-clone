@@ -514,7 +514,7 @@ dropped onto the dropzone is accepted, not only one picked through the dialog.
 | Security | **GOOD** | SSRF defence is thorough and its residual DNS-rebinding window is documented rather than hidden |
 | Frontend UX | **GOOD** | Was **NEEDS WORK** — a status dashboard as the front door and a feature missing from the nav |
 | Accessibility | **GOOD** | 44px targets, reduced motion, labelled icon controls, keyboard-reachable dropzone |
-| Testing | **GOOD** | 359 tests across four layers; e2e covers desktop and mobile; remote HTTP is mocked, never live |
+| Testing | **GOOD** | 361 tests across four layers; e2e covers desktop and mobile; remote HTTP is mocked, never live |
 
 No dimension grades below GOOD after this pass. The two that were weakest going
 in — frontend UX and dependency hygiene — were the two that got real work.
