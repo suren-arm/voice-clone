@@ -140,7 +140,9 @@ def apply_speed(narration_path: str | Path, factor: float, *, out_path: str | Pa
             shutil.copyfile(narration_path, out_path)
         return out_path
     if not (_ATEMPO_MIN <= factor <= _ATEMPO_MAX):
-        raise AudioMixError(f"Speed factor {factor} is outside the supported {_ATEMPO_MIN}-{_ATEMPO_MAX} range.")
+        raise AudioMixError(
+            f"Speed factor {factor} is outside the supported {_ATEMPO_MIN}-{_ATEMPO_MAX} range."
+        )
     if not ffmpeg_available():
         raise AudioMixError("ffmpeg is not installed on this server.")
 

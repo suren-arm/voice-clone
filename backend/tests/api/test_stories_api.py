@@ -30,9 +30,7 @@ def test_story_generation_without_api_key_is_503(client):
 
 
 def test_explicit_unconfigured_provider_is_503_not_a_silent_fallback(client):
-    response = client.post(
-        "/api/v1/stories/generate", json=_story_payload(provider="openai")
-    )
+    response = client.post("/api/v1/stories/generate", json=_story_payload(provider="openai"))
     assert response.status_code == 503
     assert "OpenAI" in response.json()["error"]["message"]
 
@@ -63,12 +61,20 @@ def test_missing_characters_is_422(client):
 
 
 def test_blank_idea_is_422(client):
-    assert client.post("/api/v1/stories/generate", json=_story_payload(idea="   ")).status_code == 422
+    assert (
+        client.post("/api/v1/stories/generate", json=_story_payload(idea="   ")).status_code == 422
+    )
 
 
 def test_unknown_length_or_tone_is_422(client):
-    assert client.post("/api/v1/stories/generate", json=_story_payload(length="epic")).status_code == 422
-    assert client.post("/api/v1/stories/generate", json=_story_payload(tone="scary")).status_code == 422
+    assert (
+        client.post("/api/v1/stories/generate", json=_story_payload(length="epic")).status_code
+        == 422
+    )
+    assert (
+        client.post("/api/v1/stories/generate", json=_story_payload(tone="scary")).status_code
+        == 422
+    )
 
 
 def test_story_generation_is_rate_limited(client, settings, monkeypatch):

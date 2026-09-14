@@ -63,7 +63,9 @@ def _request(**overrides) -> StoryRequest:
 
 
 def test_generates_a_story_with_title_and_body_and_names_the_provider():
-    provider = _FakeProvider(text="The Rabbit and the Fox\n\nOnce upon a time, they met in the forest.")
+    provider = _FakeProvider(
+        text="The Rabbit and the Fox\n\nOnce upon a time, they met in the forest."
+    )
     service = StoryService(registry=_registry(provider))
 
     result = service.generate(_request())

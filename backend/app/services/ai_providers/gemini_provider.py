@@ -80,7 +80,7 @@ class GeminiProvider(AiTextProvider):
             raise ProviderResponseError(str(exc)) from exc
         except TimeoutError as exc:
             raise ProviderTimeoutError(str(exc)) from exc
-        except Exception as exc:  # noqa: BLE001 - covers httpx timeouts genai surfaces raw
+        except Exception as exc:
             if "timeout" in str(exc).lower() or "timed out" in str(exc).lower():
                 raise ProviderTimeoutError(str(exc)) from exc
             raise ProviderError(str(exc)) from exc

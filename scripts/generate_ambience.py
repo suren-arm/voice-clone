@@ -101,7 +101,7 @@ def generate_forest(seed: int = 23) -> np.ndarray:
     window = 9
     kernel = np.ones(window) / window
     wind = np.convolve(brown, kernel, mode="same")
-    wind /= (np.max(np.abs(wind)) or 1.0)
+    wind /= np.max(np.abs(wind)) or 1.0
 
     # Slow gusts: an integer-cycle envelope so the loop point matches exactly.
     gusts = 0.55 + 0.45 * _sine(_cycles(4), t, phase=0.4) * _sine(_cycles(7), t, phase=2.0)

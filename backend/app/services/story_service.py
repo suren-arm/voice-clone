@@ -42,9 +42,7 @@ class StoryService:
             # The vendor-specific detail (auth failure, quota, raw SDK
             # message) is logged for developers; only the safe, generic
             # user_message ever reaches the client.
-            logger.warning(
-                "Story generation failed on provider '%s': %s", provider.id, exc
-            )
+            logger.warning("Story generation failed on provider '%s': %s", provider.id, exc)
             if isinstance(exc, ProviderUnavailableError):
                 raise StoryServiceUnavailableError(exc.user_message) from exc
             raise StoryGenerationFailedError(exc.user_message) from exc

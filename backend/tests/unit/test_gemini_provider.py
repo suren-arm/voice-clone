@@ -24,7 +24,9 @@ class _FakeResponse:
 
 
 class _FakeModels:
-    def __init__(self, response_text: str | None = "A story.", *, error: Exception | None = None) -> None:
+    def __init__(
+        self, response_text: str | None = "A story.", *, error: Exception | None = None
+    ) -> None:
         self._response_text = response_text
         self._error = error
         self.last_kwargs: dict | None = None

@@ -49,7 +49,7 @@ def test_synthesize_english_produces_real_audio():
 
 
 def test_synthesize_armenian_produces_real_audio():
-    audio, sr = synthesize_espeak("Բարև ձեզ։", "hy")
+    audio, _sr = synthesize_espeak("Բարև ձեզ։", "hy")
     assert audio.size > 0
     assert np.max(np.abs(audio)) > 0.01
 

@@ -64,7 +64,7 @@ class AnthropicProvider(AiTextProvider):
             raise ProviderResponseError(str(exc)) from exc
         except anthropic.APIConnectionError as exc:
             raise ProviderTimeoutError(str(exc)) from exc
-        except Exception as exc:  # noqa: BLE001 - never let a raw SDK error escape
+        except Exception as exc:
             raise ProviderError(str(exc)) from exc
 
         text = "".join(block.text for block in response.content if block.type == "text").strip()

@@ -32,16 +32,14 @@ _SAMPLE_TEXT = {
 DEFAULT_VOICE_ENGINE = "espeak-ng"
 
 
-def ensure_default_voices(session, storage: LocalStorage) -> None:  # noqa: ANN001 - Session
+def ensure_default_voices(session, storage: LocalStorage) -> None:
     """Create any missing default-voice rows. Safe to call on every startup."""
     if not espeak_available():
         logger.warning("espeak-ng not found on PATH; default voices will not be available")
         return
 
     existing_variants = set(
-        session.scalars(
-            select(Voice.engine_variant).where(Voice.engine == DEFAULT_VOICE_ENGINE)
-        )
+        session.scalars(select(Voice.engine_variant).where(Voice.engine == DEFAULT_VOICE_ENGINE))
     )
 
     created = 0

@@ -7,8 +7,12 @@ from dataclasses import dataclass
 import pytest
 
 import app.services.ai_providers.anthropic_provider as module
-from app.services.ai_providers.base import ProviderResponseError, ProviderUnavailableError, StoryPrompt
 from app.services.ai_providers.anthropic_provider import AnthropicProvider
+from app.services.ai_providers.base import (
+    ProviderResponseError,
+    ProviderUnavailableError,
+    StoryPrompt,
+)
 
 
 @dataclass

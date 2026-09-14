@@ -46,22 +46,19 @@ class ProviderAuthError(ProviderError):
 
 class ProviderRateLimitError(ProviderError):
     user_message = (
-        "This AI provider's rate limit was reached. Try again shortly, or choose "
-        "another provider."
+        "This AI provider's rate limit was reached. Try again shortly, or choose another provider."
     )
 
 
 class ProviderQuotaExceededError(ProviderError):
     user_message = (
-        "This AI provider's usage quota has been reached. Please choose another "
-        "provider."
+        "This AI provider's usage quota has been reached. Please choose another provider."
     )
 
 
 class ProviderTimeoutError(ProviderError):
     user_message = (
-        "This AI provider took too long to respond. Try again, or choose another "
-        "provider."
+        "This AI provider took too long to respond. Try again, or choose another provider."
     )
 
 

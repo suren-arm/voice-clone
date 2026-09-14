@@ -37,9 +37,7 @@ def test_raises_clearly_when_ffmpeg_is_unavailable(tmp_path: Path, monkeypatch):
     narration = tmp_path / "narration.wav"
     narration.write_bytes(b"placeholder")
     with pytest.raises(AudioMixError, match="ffmpeg is not installed"):
-        mix_with_background(
-            narration, "mystical", volume_percent=15, out_path=tmp_path / "out.wav"
-        )
+        mix_with_background(narration, "mystical", volume_percent=15, out_path=tmp_path / "out.wav")
 
 
 def _write_tone(path: Path, *, seconds: float = 2.0, sample_rate: int = 24_000) -> None:

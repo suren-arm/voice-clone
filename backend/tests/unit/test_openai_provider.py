@@ -34,7 +34,9 @@ class _FakeCompletion:
 
 
 class _FakeCompletions:
-    def __init__(self, response_text: str | None = "A story.", *, error: Exception | None = None) -> None:
+    def __init__(
+        self, response_text: str | None = "A story.", *, error: Exception | None = None
+    ) -> None:
         self._response_text = response_text
         self._error = error
         self.last_kwargs: dict | None = None
@@ -43,7 +45,9 @@ class _FakeCompletions:
         self.last_kwargs = kwargs
         if self._error:
             raise self._error
-        return _FakeCompletion(choices=[_FakeChoice(message=_FakeMessage(content=self._response_text))])
+        return _FakeCompletion(
+            choices=[_FakeChoice(message=_FakeMessage(content=self._response_text))]
+        )
 
 
 class _FakeChat:
@@ -92,9 +96,7 @@ def test_empty_response_raises(monkeypatch):
 
 
 def test_auth_error_maps_to_provider_auth_error(monkeypatch):
-    error = openai.AuthenticationError(
-        "bad key", response=_fake_response(401), body=None
-    )
+    error = openai.AuthenticationError("bad key", response=_fake_response(401), body=None)
     completions = _FakeCompletions(error=error)
     monkeypatch.setattr(module.openai, "OpenAI", lambda **_: _FakeClient(completions))
 

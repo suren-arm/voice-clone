@@ -67,7 +67,7 @@ class OpenAiProvider(AiTextProvider):
             raise ProviderTimeoutError(str(exc)) from exc
         except openai.APIStatusError as exc:
             raise ProviderResponseError(str(exc)) from exc
-        except Exception as exc:  # noqa: BLE001 - never let a raw SDK error escape
+        except Exception as exc:
             raise ProviderError(str(exc)) from exc
 
         choice = response.choices[0] if response.choices else None
