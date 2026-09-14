@@ -433,6 +433,18 @@ Every check below was run, not assumed.
 | Frontend `vitest run` | PASS — 71 passed |
 | Playwright e2e | PASS — 16 passed (chromium + mobile-chrome) |
 
+**Production, at the time of writing, is half down — and not because of this
+work.** The Cloudflare Pages frontend is live and serving this app's build
+(`ai-voice-studio-660.pages.dev`, HTTP 200, verified). The Render backend is
+not: DNS resolves, TCP connects in 5 ms and TLS completes in 26 ms, and then
+`https://voice-clone.onrender.com/health` returns **zero bytes for 240 s**. A
+healthy network path followed by silence means Render's router is waiting on an
+origin that never answers. None of the changes in this review are deployed —
+they sit on a branch, and the deploy workflow runs on `master` only — so this is
+the pre-existing state of production, not a regression introduced here.
+Root-causing it needs the Render dashboard's own logs, which neither this
+sandbox nor CI can reach.
+
 Six e2e assertions were updated, all of them for deliberate renames from the
 redesign ("Book Reader" → "Read a Book", "Create Voice" → "Make My Own Voice",
 "History" → "My Recordings", and `system-status` now needing its disclosure
