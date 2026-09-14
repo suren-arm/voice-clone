@@ -1,11 +1,12 @@
 'use client';
 
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/Button';
 import { Callout } from '@/components/Callout';
 import { Card } from '@/components/Card';
 import { Field } from '@/components/Field';
+import { LanguageSelect } from '@/components/LanguageSelect';
 import { Spinner } from '@/components/Spinner';
 import type { RecordedClip } from '@/hooks/useRecorder';
 import { useSystemInfo } from '@/hooks/useSystemInfo';
@@ -40,10 +41,19 @@ export function CreateVoiceForm() {
   const maxSeconds = limits?.maxReferenceSeconds ?? 120;
   const maxBytes = limits?.maxUploadBytes ?? 25 * 1024 * 1024;
 
-  const selectedLanguage = useMemo(
-    () => info?.languages.find((option) => option.code === language) ?? null,
-    [info, language],
+  // Cloning is the only thing this screen produces, so the language list is
+  // the cloneable subset -- not every language the app supports.
+  const cloneableLanguages = useMemo(
+    () => (info?.languages ?? []).filter((option) => option.supportsClonedVoice),
+    [info],
   );
+
+  useEffect(() => {
+    if (cloneableLanguages.length === 0) return;
+    if (!cloneableLanguages.some((option) => option.code === language)) {
+      setLanguage(cloneableLanguages[0]!.code);
+    }
+  }, [cloneableLanguages, language]);
 
   const hasAudio = mode === 'record' ? clip !== null : file !== null;
   const canSubmit = hasAudio && consent && name.trim().length > 0 && !submitting;
@@ -188,31 +198,18 @@ export function CreateVoiceForm() {
             )}
           </Field>
 
-          <Field
+          {/* Only languages the *cloning* model can actually speak: a voice
+              created for one it cannot would be refused by every later
+              narration request. Armenian and Russian are read aloud by the
+              built-in studio voices instead. */}
+          <LanguageSelect
+            languages={cloneableLanguages}
+            value={language}
+            onChange={setLanguage}
             label="Primary language"
-            hint={
-              selectedLanguage?.experimental
-                ? selectedLanguage.note
-                : 'You can still generate speech in any supported language later.'
-            }
-          >
-            {(props) => (
-              <select
-                {...props}
-                className="select"
-                value={language}
-                onChange={(event) => setLanguage(event.target.value)}
-                data-testid="voice-language"
-              >
-                {info?.languages.map((option) => (
-                  <option key={option.code} value={option.code}>
-                    {option.name}
-                    {option.experimental ? ' — experimental' : ''}
-                  </option>
-                ))}
-              </select>
-            )}
-          </Field>
+            hint="The language this voice will be cloned for."
+            testId="voice-language"
+          />
         </div>
       </Card>
 

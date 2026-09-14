@@ -1,10 +1,11 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Button } from '@/components/Button';
 import { Callout } from '@/components/Callout';
 import { Card } from '@/components/Card';
 import { useDefaultVoices } from '@/hooks/useDefaultVoices';
+import { useSystemInfo } from '@/hooks/useSystemInfo';
 import { useToast } from '@/hooks/useToast';
 import { useVoices } from '@/hooks/useVoices';
 import { ApiError } from '@/services/apiClient';
@@ -35,6 +36,7 @@ type ReadingPreset = 'standard' | 'bedtime' | 'fairyTale' | 'study';
 export function BookReaderForm() {
   const { voices } = useVoices();
   const { defaultVoices } = useDefaultVoices();
+  const { info } = useSystemInfo();
   const { push } = useToast();
 
   const [document, setDocument] = useState<BookDocument | null>(null);
@@ -103,7 +105,9 @@ export function BookReaderForm() {
     }
   }
 
-  const cloningBlocked = voiceSource === 'cloned' && isClonedVoiceBlockedForLanguage(language);
+  const languages = useMemo(() => info?.languages ?? [], [info]);
+  const cloningBlocked =
+    voiceSource === 'cloned' && isClonedVoiceBlockedForLanguage(languages, language);
   const canNarrate = document !== null && Boolean(voiceId) && !cloningBlocked && !narrating;
 
   async function handleNarrate() {
@@ -177,7 +181,12 @@ export function BookReaderForm() {
 
       {document && (
         <Card title={document.title ?? 'Untitled'} hint={`${document.charCount.toLocaleString()} characters extracted`}>
-          <BookPreview document={document} language={language} onLanguageChange={setLanguage} />
+          <BookPreview
+            document={document}
+            language={language}
+            languages={languages}
+            onLanguageChange={setLanguage}
+          />
         </Card>
       )}
 
@@ -213,6 +222,7 @@ export function BookReaderForm() {
 
             <VoiceAndBackgroundFields
               language={language}
+              languages={languages}
               clonedVoices={voices}
               defaultVoices={defaultVoices}
               voiceSource={voiceSource}

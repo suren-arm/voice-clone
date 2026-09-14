@@ -3,20 +3,16 @@
 import { useEffect, useState } from 'react';
 import { Button } from '@/components/Button';
 import { Callout } from '@/components/Callout';
-import { Field } from '@/components/Field';
+import { LanguageSelect } from '@/components/LanguageSelect';
 import { Spinner } from '@/components/Spinner';
 import { ApiError } from '@/services/apiClient';
 import { getBookSection } from '@/services/books';
-import type { BookDocument, BookSection } from '@/types';
-
-const LANGUAGE_OPTIONS: { value: string; label: string }[] = [
-  { value: 'en', label: 'English' },
-  { value: 'hy', label: 'Հայերեն' },
-];
+import type { BookDocument, BookSection, LanguageOption } from '@/types';
 
 interface BookPreviewProps {
   document: BookDocument;
   language: string;
+  languages: LanguageOption[];
   onLanguageChange: (language: string) => void;
 }
 
@@ -25,7 +21,12 @@ interface BookPreviewProps {
  * heading-delimited HTML block) at a time, never the whole book in a single
  * textarea -- a long book can be hundreds of sections.
  */
-export function BookPreview({ document, language, onLanguageChange }: BookPreviewProps) {
+export function BookPreview({
+  document,
+  language,
+  languages,
+  onLanguageChange,
+}: BookPreviewProps) {
   const [index, setIndex] = useState(0);
   const [section, setSection] = useState<BookSection | null>(null);
   const [loading, setLoading] = useState(true);
@@ -74,26 +75,14 @@ export function BookPreview({ document, language, onLanguageChange }: BookPrevie
         </div>
       </div>
 
-      <Field
+      <LanguageSelect
+        languages={languages}
+        value={language}
+        onChange={onLanguageChange}
         label="What language is it in?"
         hint="We guessed this from the text. Change it if we got it wrong."
-      >
-        {(props) => (
-          <select
-            {...props}
-            className="select"
-            value={language}
-            onChange={(event) => onLanguageChange(event.target.value)}
-            data-testid="book-language-select"
-          >
-            {LANGUAGE_OPTIONS.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
-        )}
-      </Field>
+        testId="book-language-select"
+      />
 
       <div className="field">
         <div className="row row--between" style={{ gap: 8 }}>

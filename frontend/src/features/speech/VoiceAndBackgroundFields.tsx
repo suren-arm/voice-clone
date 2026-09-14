@@ -4,15 +4,19 @@ import Link from 'next/link';
 import { useEffect, useMemo } from 'react';
 import { Callout } from '@/components/Callout';
 import { Field } from '@/components/Field';
-import type { BackgroundSound, Voice, VoiceSource } from '@/types';
+import type { BackgroundSound, LanguageOption, Voice, VoiceSource } from '@/types';
 import {
-  ARMENIAN_CLONING_BLOCKED_MESSAGE,
   BACKGROUND_SOUND_OPTIONS,
+  clonedVoiceBlockedMessage,
   isClonedVoiceBlockedForLanguage,
+  languageName,
+  voicesForLanguage,
 } from '@/utils/voiceCapability';
 
 interface VoiceAndBackgroundFieldsProps {
   language: string;
+  /** The capability catalogue from GET /system/info. */
+  languages: LanguageOption[];
   clonedVoices: Voice[];
   defaultVoices: Voice[];
   voiceSource: VoiceSource;
@@ -35,6 +39,7 @@ interface VoiceAndBackgroundFieldsProps {
  */
 export function VoiceAndBackgroundFields({
   language,
+  languages,
   clonedVoices,
   defaultVoices,
   voiceSource,
@@ -47,10 +52,16 @@ export function VoiceAndBackgroundFields({
   onBackgroundVolumeChange,
   disabled = false,
 }: VoiceAndBackgroundFieldsProps) {
-  const cloningBlocked = isClonedVoiceBlockedForLanguage(language);
+  const cloningBlocked = isClonedVoiceBlockedForLanguage(languages, language);
+  // Only ever offer voices that genuinely speak the chosen language -- an
+  // invalid combination should be unpickable, not an error after the fact.
   const defaultVoicesForLanguage = useMemo(
-    () => defaultVoices.filter((voice) => voice.language === language),
+    () => voicesForLanguage(defaultVoices, language),
     [defaultVoices, language],
+  );
+  const clonedVoicesForLanguage = useMemo(
+    () => voicesForLanguage(clonedVoices, language),
+    [clonedVoices, language],
   );
 
   // Keep the default-voice selection valid as the language changes (cloned
@@ -93,19 +104,20 @@ export function VoiceAndBackgroundFields({
       </Field>
 
       {voiceSource === 'cloned' && cloningBlocked && (
-        <Callout kind="warning" title="Armenian cloning is not supported">
-          {ARMENIAN_CLONING_BLOCKED_MESSAGE}
+        <Callout kind="warning" title={`Your own voice cannot speak ${languageName(languages, language)}`}>
+          {clonedVoiceBlockedMessage(languages, language)} A studio voice speaks it perfectly —
+          switch to “🧑‍🎨 A Studio Voice” above.
         </Callout>
       )}
 
-      {voiceSource === 'cloned' && !cloningBlocked && clonedVoices.length === 0 && (
+      {voiceSource === 'cloned' && !cloningBlocked && clonedVoicesForLanguage.length === 0 && (
         <Callout kind="info" title="No cloned voice yet">
           Create a voice profile from a short recording, or switch to a default voice above.{' '}
           <Link href="/voices/new">Create voice</Link>
         </Callout>
       )}
 
-      {voiceSource === 'cloned' && !cloningBlocked && clonedVoices.length > 0 && (
+      {voiceSource === 'cloned' && !cloningBlocked && clonedVoicesForLanguage.length > 0 && (
         <Field label="Voice">
           {(props) => (
             <select
@@ -116,9 +128,9 @@ export function VoiceAndBackgroundFields({
               onChange={(event) => onVoiceIdChange(event.target.value)}
               data-testid="cloned-voice-select"
             >
-              {clonedVoices.map((voice) => (
+              {clonedVoicesForLanguage.map((voice) => (
                 <option key={voice.id} value={voice.id}>
-                  {voice.name} ({voice.language})
+                  {voice.name}
                 </option>
               ))}
             </select>
@@ -131,7 +143,7 @@ export function VoiceAndBackgroundFields({
           label="Voice"
           hint={
             defaultVoicesForLanguage.length === 0
-              ? 'No studio voice for this language yet.'
+              ? `No studio voice speaks ${languageName(languages, language)} yet.`
               : 'A ready-made voice — no recording needed.'
           }
         >

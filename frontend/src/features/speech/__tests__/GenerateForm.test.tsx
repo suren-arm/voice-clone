@@ -24,14 +24,26 @@ const systemInfo: SystemInfo = {
   },
   deviceDetails: {},
   languages: [
-    { code: 'en', name: 'English', native: true, experimental: false, note: null },
-    { code: 'ru', name: 'Russian', native: true, experimental: false, note: null },
+    {
+      code: 'en',
+      name: 'English',
+      englishName: 'English',
+      supportsDefaultVoice: true,
+      supportsClonedVoice: true,
+    },
     {
       code: 'hy',
-      name: 'Armenian (experimental)',
-      native: false,
-      experimental: true,
-      note: 'Armenian is not natively supported by this model.',
+      name: 'Հայերեն',
+      englishName: 'Armenian',
+      supportsDefaultVoice: true,
+      supportsClonedVoice: false,
+    },
+    {
+      code: 'ru',
+      name: 'Русский',
+      englishName: 'Russian',
+      supportsDefaultVoice: true,
+      supportsClonedVoice: false,
     },
   ],
   limits: {
@@ -124,7 +136,9 @@ describe('GenerateForm', () => {
     renderForm();
     const voiceSelect = await screen.findByTestId('cloned-voice-select');
     expect(voiceSelect).toHaveValue(voice.id);
-    expect(screen.getByRole('option', { name: /Armenian \(experimental\) — experimental/ })).toBeInTheDocument();
+    // Each language is offered under its own name, not an English label.
+    expect(screen.getByRole('option', { name: /Հայերեն/ })).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: /Русский/ })).toBeInTheDocument();
   });
 
   it('shows the character counter against the server limit', async () => {
@@ -165,12 +179,16 @@ describe('GenerateForm', () => {
     expect(screen.getByText('Watermarked')).toBeInTheDocument();
   });
 
-  it('blocks cloned-voice narration for Armenian with a clear explanation', async () => {
+  it('blocks a cloned voice for a language it cannot speak, in plain words', async () => {
     renderForm();
     const languageSelect = await screen.findByTestId('language-select');
     await userEvent.selectOptions(languageSelect, 'hy');
 
-    expect(await screen.findByText(/does not support Armenian/i)).toBeInTheDocument();
+    expect(
+      await screen.findByText(/This voice cannot speak Հայերեն\. Please choose another voice\./),
+    ).toBeInTheDocument();
+    // Nothing about models or language codes reaches a child.
+    expect(screen.queryByText(/model/i)).not.toBeInTheDocument();
     expect(screen.getByTestId('generate-submit')).toBeDisabled();
   });
 

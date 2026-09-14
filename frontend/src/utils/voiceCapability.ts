@@ -1,22 +1,49 @@
-import type { BackgroundSound } from '@/types';
+import type { BackgroundSound, LanguageOption, Voice } from '@/types';
 
 /**
- * Capability gating for the voice-source / language combination.
+ * Which voices can speak which language.
  *
- * The cloning engine's transliteration bridge for Armenian is real but is an
- * approximation the product does not want to present as equivalent to a
- * supported combination (see docs/ARMENIAN.md) -- so the "Create Fairy Tale"
- * and "Text to Speech" screens disable cloned-voice narration for Armenian
- * outright and explain why, rather than letting the request through to an
- * obscure backend error.
+ * Every answer here comes from the backend's capability flags
+ * (`GET /api/v1/system/info` -> `languages[].supportsClonedVoice` /
+ * `supportsDefaultVoice`), which are read off the real engines. Nothing is
+ * hardcoded: this file used to assert "Armenian is blocked for cloned
+ * voices" as a literal, which happened to be true but would have gone
+ * silently wrong the moment a model gained Armenian, or a different
+ * Chatterbox variant changed what cloning could do.
  */
-export const ARMENIAN_LANGUAGE_CODE = 'hy';
 
-export const ARMENIAN_CLONING_BLOCKED_MESSAGE =
-  'This cloned voice model currently does not support Armenian. Please choose an Armenian default voice.';
+export function findLanguage(
+  languages: LanguageOption[],
+  code: string,
+): LanguageOption | undefined {
+  return languages.find((language) => language.code === code);
+}
 
-export function isClonedVoiceBlockedForLanguage(language: string): boolean {
-  return language.toLowerCase() === ARMENIAN_LANGUAGE_CODE;
+/** The name a speaker of the language would recognise, for messages. */
+export function languageName(languages: LanguageOption[], code: string): string {
+  return findLanguage(languages, code)?.name ?? code;
+}
+
+export function isClonedVoiceBlockedForLanguage(
+  languages: LanguageOption[],
+  code: string,
+): boolean {
+  const language = findLanguage(languages, code);
+  // Unknown language: don't claim it is blocked, let the backend answer.
+  return language ? !language.supportsClonedVoice : false;
+}
+
+/**
+ * Names the language and the next step, never the model that cannot do it
+ * -- this is read by a child. The technical reason stays in the server logs.
+ */
+export function clonedVoiceBlockedMessage(languages: LanguageOption[], code: string): string {
+  return `This voice cannot speak ${languageName(languages, code)}. Please choose another voice.`;
+}
+
+/** Voices that genuinely speak `code` -- what the voice picker should show. */
+export function voicesForLanguage(voices: Voice[], code: string): Voice[] {
+  return voices.filter((voice) => voice.language === code);
 }
 
 /**
@@ -31,4 +58,9 @@ export const BACKGROUND_SOUND_OPTIONS: { value: BackgroundSound; label: string }
   { value: 'bedtime', label: '🌙 Bedtime' },
 ];
 
+/**
+ * Conservative on purpose. The ambience is atmosphere, not a second voice;
+ * the backend additionally caps and ducks it (see ai/audio_mix.py) so this
+ * is a starting point rather than the only safeguard.
+ */
 export const DEFAULT_BACKGROUND_VOLUME = 15;

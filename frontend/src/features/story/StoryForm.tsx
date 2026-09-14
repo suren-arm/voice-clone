@@ -1,12 +1,14 @@
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Button } from '@/components/Button';
 import { Callout } from '@/components/Callout';
 import { Card } from '@/components/Card';
 import { Field } from '@/components/Field';
+import { LanguageSelect } from '@/components/LanguageSelect';
 import { useAiProviders } from '@/hooks/useAiProviders';
 import { useDefaultVoices } from '@/hooks/useDefaultVoices';
+import { useSystemInfo } from '@/hooks/useSystemInfo';
 import { useToast } from '@/hooks/useToast';
 import { useVoices } from '@/hooks/useVoices';
 import { ApiError } from '@/services/apiClient';
@@ -27,11 +29,6 @@ import { GenerationResult } from '@/features/speech/GenerationResult';
 import { VoiceAndBackgroundFields } from '@/features/speech/VoiceAndBackgroundFields';
 import { DEFAULT_BACKGROUND_VOLUME, isClonedVoiceBlockedForLanguage } from '@/utils/voiceCapability';
 
-const LANGUAGE_OPTIONS: { value: StoryLanguage; label: string }[] = [
-  { value: 'en', label: 'English' },
-  { value: 'hy', label: 'Հայերեն' },
-];
-
 const AGE_GROUP_OPTIONS: StoryAgeGroup[] = ['3-5', '6-8', '9-12'];
 const LENGTH_OPTIONS: { value: StoryLength; label: string }[] = [
   { value: 'short', label: 'Short' },
@@ -48,6 +45,7 @@ const TONE_OPTIONS: { value: StoryTone; label: string }[] = [
 
 export function StoryForm() {
   const { voices } = useVoices();
+  const { info } = useSystemInfo();
   const { defaultVoices } = useDefaultVoices();
   const { info: aiProviders } = useAiProviders();
   const { push } = useToast();
@@ -110,7 +108,9 @@ export function StoryForm() {
     }
   }
 
-  const cloningBlocked = voiceSource === 'cloned' && isClonedVoiceBlockedForLanguage(language);
+  const languages = useMemo(() => info?.languages ?? [], [info]);
+  const cloningBlocked =
+    voiceSource === 'cloned' && isClonedVoiceBlockedForLanguage(languages, language);
   const canNarrate =
     Boolean(voiceId) && !cloningBlocked && storyText.trim().length > 0 && !narrating;
 
@@ -151,23 +151,16 @@ export function StoryForm() {
         }
       >
         <div className="stack">
-          <Field label="Language">
-            {(props) => (
-              <select
-                {...props}
-                className="select"
-                value={language}
-                onChange={(event) => setLanguage(event.target.value as StoryLanguage)}
-                data-testid="story-language-select"
-              >
-                {LANGUAGE_OPTIONS.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            )}
-          </Field>
+          {/* The same catalogue Text to Speech uses -- one list, so a
+              language can never be offered for a story it cannot be read in. */}
+          <LanguageSelect
+            languages={languages}
+            value={language}
+            onChange={(code) => setLanguage(code as StoryLanguage)}
+            hint="Your story is written and read aloud in this language."
+            disabled={generatingStory}
+            testId="story-language-select"
+          />
 
           <Field label="Who is in your story?">
             {(props) => (
@@ -331,6 +324,7 @@ export function StoryForm() {
 
             <VoiceAndBackgroundFields
               language={language}
+              languages={languages}
               clonedVoices={voices}
               defaultVoices={defaultVoices}
               voiceSource={voiceSource}

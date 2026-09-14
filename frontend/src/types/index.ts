@@ -62,11 +62,16 @@ export interface Page<T> {
 }
 
 export interface LanguageOption {
+  /** ISO 639-1 -- the identifier used everywhere. Never a UI label. */
   code: string;
+  /** The language's own name, e.g. "Հայերեն". What the selector shows. */
   name: string;
-  native: boolean;
-  experimental: boolean;
-  note: string | null;
+  /** English name, e.g. "Armenian". */
+  englishName: string;
+  /** A built-in voice speaks this language. */
+  supportsDefaultVoice: boolean;
+  /** The cloning model can genuinely synthesize this language. */
+  supportsClonedVoice: boolean;
 }
 
 export interface EngineDescription {

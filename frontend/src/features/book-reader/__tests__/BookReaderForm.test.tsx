@@ -64,6 +64,58 @@ const generation: Generation = {
   backgroundNotice: null,
 };
 
+/** The language catalogue every screen now reads from. */
+const systemInfo = {
+  engine: {
+    name: 'mock',
+    variant: 'mock',
+    device: 'cpu',
+    sampleRate: 24000,
+    loaded: true,
+    supportsStreaming: false,
+    supportsCachedConditioning: true,
+    watermarked: false,
+    license: 'MIT',
+    notes: null,
+  },
+  deviceDetails: {},
+  languages: [
+    {
+      code: 'en',
+      name: 'English',
+      englishName: 'English',
+      supportsDefaultVoice: true,
+      supportsClonedVoice: true,
+    },
+    {
+      code: 'hy',
+      name: 'Հայերեն',
+      englishName: 'Armenian',
+      supportsDefaultVoice: true,
+      supportsClonedVoice: false,
+    },
+    {
+      code: 'ru',
+      name: 'Русский',
+      englishName: 'Russian',
+      supportsDefaultVoice: true,
+      supportsClonedVoice: false,
+    },
+  ],
+  limits: {
+    maxUploadBytes: 26214400,
+    minReferenceSeconds: 3,
+    maxReferenceSeconds: 120,
+    maxTextChars: 2000,
+    maxVoices: 100,
+    requireConsent: true,
+    maxPdfBytes: 26214400,
+    maxPdfPages: 500,
+    maxBookNarrationChars: 8000,
+  },
+  acceptedAudioFormats: ['wav'],
+};
+
 const fetchMock = vi.fn();
 
 function jsonResponse(body: unknown) {
@@ -74,6 +126,7 @@ function jsonResponse(body: unknown) {
 }
 
 function defaultRoute(url: string) {
+  if (url.includes('/system/info')) return jsonResponse(systemInfo);
   if (url.includes('/voices/defaults')) return jsonResponse([defaultVoice]);
   if (url.includes('/voices')) return jsonResponse({ items: [], meta: { total: 0, limit: 100, offset: 0 } });
   if (url.includes('/books/upload') || url.includes('/books/from-url')) return jsonResponse(pdfDocument);
@@ -191,7 +244,7 @@ describe('BookReaderForm', () => {
     expect(screen.getByTestId('background-bedtime')).toHaveAttribute('aria-pressed', 'true');
   });
 
-  it('blocks cloned-voice narration for Armenian with a clear explanation', async () => {
+  it('blocks a cloned voice for a language it cannot speak, in plain words', async () => {
     renderForm();
     await userEvent.upload(screen.getByTestId('book-pdf-input'), pdfFile());
     await userEvent.click(screen.getByTestId('load-book-submit'));
@@ -200,7 +253,9 @@ describe('BookReaderForm', () => {
     await userEvent.selectOptions(screen.getByTestId('book-language-select'), 'hy');
     await userEvent.click(screen.getByTestId('voice-source-cloned'));
 
-    expect(await screen.findByText(/does not support Armenian/i)).toBeInTheDocument();
+    expect(
+      await screen.findByText(/This voice cannot speak Հայերեն\. Please choose another voice\./),
+    ).toBeInTheDocument();
     expect(screen.getByTestId('narrate-book-submit')).toBeDisabled();
   });
 

@@ -18,14 +18,26 @@ export const systemInfo = {
   },
   deviceDetails: { device: 'cpu' },
   languages: [
-    { code: 'en', name: 'English', native: true, experimental: false, note: null },
-    { code: 'ru', name: 'Russian', native: true, experimental: false, note: null },
+    {
+      code: 'en',
+      name: 'English',
+      englishName: 'English',
+      supportsDefaultVoice: true,
+      supportsClonedVoice: true,
+    },
     {
       code: 'hy',
-      name: 'Armenian (experimental)',
-      native: false,
-      experimental: true,
-      note: 'Armenian is not natively supported by this model.',
+      name: 'Հայերեն',
+      englishName: 'Armenian',
+      supportsDefaultVoice: true,
+      supportsClonedVoice: false,
+    },
+    {
+      code: 'ru',
+      name: 'Русский',
+      englishName: 'Russian',
+      supportsDefaultVoice: true,
+      supportsClonedVoice: false,
     },
   ],
   limits: {

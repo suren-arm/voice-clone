@@ -90,11 +90,11 @@ test('microphone recording produces a usable clip', async ({ page }) => {
   await expect(page.getByTestId('record-again')).toBeVisible();
 });
 
-test('cloned-voice narration for Armenian is blocked with a clear explanation', async ({ page }) => {
-  // Cloned-voice Armenian is not offered as an "experimental" path through
-  // this UI at all -- it is disabled outright, with an explanation, and the
-  // user is pointed at the Armenian default voice instead. See
-  // utils/voiceCapability.ts and docs/ARMENIAN.md.
+test('a cloned voice is blocked for a language it cannot speak', async ({ page }) => {
+  // Not an "experimental" path: the capability flags from /system/info say
+  // the cloning model cannot speak Armenian, so the UI disables it outright
+  // and points at the Armenian studio voice, which speaks it natively.
+  // See utils/voiceCapability.ts and docs/ARMENIAN.md.
   await page.goto('/voices/new');
   await page.getByTestId('mode-upload').click();
   await page.getByTestId('file-input').setInputFiles({
@@ -109,7 +109,7 @@ test('cloned-voice narration for Armenian is blocked with a clear explanation', 
   await expect(page.getByTestId('language-select')).toBeVisible();
   await page.getByTestId('language-select').selectOption('hy');
 
-  await expect(page.getByText('does not support Armenian')).toBeVisible();
+  await expect(page.getByText('This voice cannot speak Հայերեն.')).toBeVisible();
   await page.getByTestId('text-input').fill('Բարև Ձեզ։');
   await expect(page.getByTestId('generate-submit')).toBeDisabled();
 

@@ -5,6 +5,7 @@ import { Button } from '@/components/Button';
 import { Callout } from '@/components/Callout';
 import { Card } from '@/components/Card';
 import { Field } from '@/components/Field';
+import { LanguageSelect } from '@/components/LanguageSelect';
 import { Spinner } from '@/components/Spinner';
 import { useDefaultVoices } from '@/hooks/useDefaultVoices';
 import { useSystemInfo } from '@/hooks/useSystemInfo';
@@ -62,7 +63,20 @@ export function GenerateForm({ initialVoiceId }: GenerateFormProps) {
     if (voiceSource === 'cloned' && selectedVoice) setLanguage(selectedVoice.language);
   }, [voiceSource, selectedVoice]);
 
-  const cloningBlocked = voiceSource === 'cloned' && isClonedVoiceBlockedForLanguage(language);
+  const languages = useMemo(() => info?.languages ?? [], [info]);
+
+  // The catalogue is the authority on what "en" even means here; if the
+  // current choice is not in it, fall back to the first language offered
+  // rather than sending a code the backend will refuse.
+  useEffect(() => {
+    if (languages.length === 0) return;
+    if (!languages.some((option) => option.code === language)) {
+      setLanguage(languages[0]!.code);
+    }
+  }, [languages, language]);
+
+  const cloningBlocked =
+    voiceSource === 'cloned' && isClonedVoiceBlockedForLanguage(languages, language);
   const over = text.length > maxChars;
   const canGenerate =
     Boolean(voiceId) && !cloningBlocked && text.trim().length > 0 && !over && !generating;
@@ -120,24 +134,12 @@ export function GenerateForm({ initialVoiceId }: GenerateFormProps) {
     <div className="stack-5">
       <Card title="🗣️ Speak My Text" hint="Type anything and hear it out loud.">
         <div className="stack">
-          <Field label="Language">
-            {(props) => (
-              <select
-                {...props}
-                className="select"
-                value={language}
-                onChange={(event) => setLanguage(event.target.value)}
-                data-testid="language-select"
-              >
-                {info?.languages.map((option) => (
-                  <option key={option.code} value={option.code}>
-                    {option.name}
-                    {option.experimental ? ' — experimental' : ''}
-                  </option>
-                ))}
-              </select>
-            )}
-          </Field>
+          <LanguageSelect
+            languages={languages}
+            value={language}
+            onChange={setLanguage}
+            disabled={generating}
+          />
 
           <Field
             label="What should I say?"
@@ -165,6 +167,7 @@ export function GenerateForm({ initialVoiceId }: GenerateFormProps) {
 
           <VoiceAndBackgroundFields
             language={language}
+            languages={languages}
             clonedVoices={voices}
             defaultVoices={defaultVoices}
             voiceSource={voiceSource}
