@@ -13,16 +13,16 @@ pytestmark = pytest.mark.skipif(not espeak_available(), reason="espeak-ng is not
 
 def test_default_voices_are_listed(client):
     body = client.get("/api/v1/voices/defaults").json()
-    assert len(body) == 4
+    assert len(body) == 6
     languages = {v["language"] for v in body}
-    assert languages == {"en", "hy"}
+    assert languages == {"en", "hy", "ru"}
     assert all(v["engine"] == "espeak-ng" for v in body)
     assert all(v["source"] == "system" for v in body)
 
 
 def test_default_voices_do_not_count_against_the_voice_quota(client, settings, monkeypatch):
     monkeypatch.setattr(settings, "max_voices", 1)
-    # The quota is for the user's *own* voices; the 4 bootstrapped default
+    # The quota is for the user's *own* voices; the bootstrapped default
     # voices must not consume it, or nobody could ever create their first
     # cloned voice on a fresh deployment.
     response = client.post(

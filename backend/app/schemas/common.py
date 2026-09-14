@@ -63,14 +63,24 @@ class DeletedResponse(ApiModel):
 
 
 class LanguageOption(ApiModel):
-    code: str
-    name: str
-    native: bool = Field(
+    """One language the app supports, and which kinds of voice can speak it.
+
+    The capability flags let the UI filter the voice list to valid choices
+    up front, rather than letting a user pick a combination that only fails
+    once generation starts.
+    """
+
+    code: str = Field(description="ISO 639-1 code -- the identifier used everywhere.")
+    name: str = Field(description="The language's own name, e.g. 'Հայերեն'. For display.")
+    english_name: str = Field(description="English name, e.g. 'Armenian'. For logs and prompts.")
+    supports_default_voice: bool = Field(
         default=True,
-        description="False for experimental paths the model does not natively support.",
+        description="A built-in voice speaks this language.",
     )
-    experimental: bool = False
-    note: str | None = None
+    supports_cloned_voice: bool = Field(
+        default=False,
+        description="The cloning model can genuinely synthesize this language.",
+    )
 
 
 class EngineDescription(ApiModel):

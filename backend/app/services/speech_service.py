@@ -48,7 +48,7 @@ from app.repositories.generation_repo import GenerationRepository
 from app.repositories.voice_repo import VoiceRepository
 from app.schemas.speech import SpeechRequest
 from app.services.default_voices import DEFAULT_VOICE_ENGINE
-from app.services.language import resolve as resolve_language
+from app.services.language import can_voice_speak, unsupported_voice_message
 from app.services.storage import LocalStorage
 
 logger = logging.getLogger(__name__)
@@ -168,37 +168,45 @@ class SpeechService:
                 details={"maxChars": max_text_chars},
             )
 
-        if voice.engine == DEFAULT_VOICE_ENGINE:
-            resolved_language, effective_text, experimental, notice, synth = (
-                voice.language,
-                None,
-                False,
-                None,
-                self._synthesize_default_voice(voice, text),
+        # One capability check for both kinds of voice, before any synthesis:
+        # a combination the chosen voice cannot speak is refused here, in the
+        # language a child can act on, rather than failing inside the engine.
+        is_cloned = voice.engine != DEFAULT_VOICE_ENGINE
+        requested_language = (language or voice.language).lower()
+        if not can_voice_speak(self.engine, is_cloned=is_cloned, language=requested_language):
+            logger.info(
+                "Refused %s voice for language %s (voice=%s)",
+                "cloned" if is_cloned else "default",
+                requested_language,
+                voice.id,
             )
+            raise UnsupportedLanguageError(unsupported_voice_message(requested_language))
+
+        if not is_cloned:
+            # A built-in voice *is* a language: espeak's hy voice cannot read
+            # Russian, so the voice's own language wins over the request and
+            # the two must agree.
+            if voice.language != requested_language:
+                raise UnsupportedLanguageError(unsupported_voice_message(requested_language))
+            resolved_language = voice.language
+            synth = self._synthesize_default_voice(voice, text)
         else:
-            try:
-                resolved = resolve_language(
-                    self.engine,
-                    language,
-                    text,
-                    include_armenian=self.settings.enable_experimental_armenian,
-                )
-            except ValueError as exc:
-                raise UnsupportedLanguageError(str(exc)) from exc
-            resolved_language = resolved.requested
-            effective_text = resolved.text if resolved.experimental else None
-            experimental = resolved.experimental
-            notice = resolved.notice
+            resolved_language = requested_language
             synth = self._synthesize_cloned_voice(
-                resolved.text,
-                resolved.engine_language,
+                text,
+                requested_language,
                 profile,
                 exaggeration=exaggeration,
                 cfg_weight=cfg_weight,
                 temperature=temperature,
                 seed=seed,
             )
+
+        # Nothing is transliterated any more: every language offered is one a
+        # real voice speaks natively, so there is no approximation to flag.
+        effective_text = None
+        experimental = False
+        notice = None
 
         audio_out, sample_rate, generation_seconds, watermarked, engine_name = synth
 

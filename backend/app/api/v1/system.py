@@ -43,7 +43,7 @@ def system_info(engine: EngineDep, settings: SettingsDep) -> SystemInfo:
             notes=info.notes or None,
         ),
         device_details=describe_device(info.device) | {"ffmpeg": ffmpeg_available()},
-        languages=language_options(engine, include_armenian=settings.enable_experimental_armenian),
+        languages=language_options(engine),
         limits=LimitsDescription(
             max_upload_bytes=settings.max_upload_bytes,
             min_reference_seconds=settings.min_reference_seconds,

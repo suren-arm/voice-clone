@@ -18,22 +18,51 @@ def test_system_info_describes_engine_languages_and_limits(client):
     assert body["limits"]["maxPdfPages"] > 0
     assert body["limits"]["maxBookNarrationChars"] > 0
 
-    codes = {lang["code"] for lang in body["languages"]}
-    assert {"en", "ru", "de"} <= codes
+    codes = [lang["code"] for lang in body["languages"]]
+    # Exactly the three the product supports end to end, in UI order -- not
+    # whatever the cloning model happens to list.
+    assert codes == ["en", "hy", "ru"]
 
 
-def test_armenian_is_advertised_as_experimental(client):
-    languages = client.get("/api/v1/system/info").json()["languages"]
-    armenian = next(lang for lang in languages if lang["code"] == "hy")
-    assert armenian["experimental"] is True
-    assert armenian["native"] is False
-    assert "not natively supported" in armenian["note"]
+def test_every_app_language_reports_which_voices_can_speak_it(client):
+    """The capability flags are what let the UI filter before generating.
+
+    They must reflect the real engines: espeak-ng ships genuine hy/hyw and ru
+    voices, while the cloning model in tests (mock, like production's turbo)
+    is English-only.
+    """
+    languages = {
+        lang["code"]: lang for lang in client.get("/api/v1/system/info").json()["languages"]
+    }
+
+    assert languages["hy"]["name"] == "Հայերեն"
+    assert languages["ru"]["name"] == "Русский"
+    assert languages["hy"]["englishName"] == "Armenian"
+
+    for code in ("en", "hy", "ru"):
+        assert languages[code]["supportsDefaultVoice"] is True, (
+            f"{code} is offered but no built-in voice speaks it"
+        )
+
+    # Cloning capability is read off the engine, never assumed from the word
+    # "multilingual" -- so assert it against what the engine actually claims.
+    from ai.mock_engine import MOCK_LANGUAGES
+
+    for code in ("en", "hy", "ru"):
+        assert languages[code]["supportsClonedVoice"] is (code in MOCK_LANGUAGES)
+
+    # And the one that holds for every variant: no cloning model this app can
+    # load speaks Armenian, so it must never be advertised as cloneable.
+    assert languages["hy"]["supportsClonedVoice"] is False
 
 
-def test_armenian_can_be_switched_off(client, settings, monkeypatch):
-    monkeypatch.setattr(settings, "enable_experimental_armenian", False)
-    languages = client.get("/api/v1/system/info").json()["languages"]
-    assert all(lang["code"] != "hy" for lang in languages)
+def test_no_language_is_offered_that_nothing_can_speak(client):
+    from app.services.language import APP_LANGUAGES
+
+    offered = {lang["code"] for lang in client.get("/api/v1/system/info").json()["languages"]}
+    assert offered <= {lang.code for lang in APP_LANGUAGES}
+    for lang in client.get("/api/v1/system/info").json()["languages"]:
+        assert lang["supportsDefaultVoice"] or lang["supportsClonedVoice"]
 
 
 def test_errors_use_the_standard_envelope(client):

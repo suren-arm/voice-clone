@@ -47,7 +47,7 @@ class DefaultVoiceSpec:
 
     id: str
     name: str
-    language: str  # app language code: "en" or "hy"
+    language: str  # app language code: "en", "hy" or "ru"
     espeak_voice: str  # the -v argument, e.g. "en-us", "hy", "hyw"
     gender: str  # "male" | "female" -- purely a label; espeak-ng's variants
     # are pitch/formant shifts on the same synthesiser, not distinct voices.
@@ -84,6 +84,20 @@ DEFAULT_VOICES: tuple[DefaultVoiceSpec, ...] = (
         language="hy",
         espeak_voice="hyw",
         gender="male",
+    ),
+    DefaultVoiceSpec(
+        id="default_ru_male",
+        name="Русский (Male, Classic)",
+        language="ru",
+        espeak_voice="ru",
+        gender="male",
+    ),
+    DefaultVoiceSpec(
+        id="default_ru_female",
+        name="Русский (Female, Classic)",
+        language="ru",
+        espeak_voice="ru+f3",
+        gender="female",
     ),
 )
 

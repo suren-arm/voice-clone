@@ -79,7 +79,14 @@ def test_conditioning_cache_is_reused_across_generations(client, created_voice, 
     assert cache.is_file()
 
 
-def test_experimental_armenian_round_trip(client, created_voice):
+def test_cloned_voice_refuses_armenian_with_a_child_readable_message(client, created_voice):
+    """No transliteration bridge any more -- refuse, and say what to do.
+
+    Armenian used to be transliterated into Russian orthography so an
+    English-trained cloning model could approximate it. That is a research
+    path, not a product capability: the real Armenian espeak-ng voices speak
+    it natively, so the cloned path says so and points at them.
+    """
     response = client.post(
         "/api/v1/speech",
         json={
@@ -88,14 +95,11 @@ def test_experimental_armenian_round_trip(client, created_voice):
             "language": "hy",
         },
     )
-    assert response.status_code == 201
-    body = response.json()
-    assert body["experimental"] is True
-    assert body["language"] == "hy"
-    assert "not natively supported" in body["notice"]
-    # The original Armenian text is what the user sees in their history.
-    assert "Բարև" in body["text"]
-    assert client.get(body["audioUrl"]).status_code == 200
+    assert response.status_code == 422, response.text
+    message = response.json()["error"]["message"]
+    assert message == "This voice cannot speak Հայերեն. Please choose another voice."
+    # Nothing about models, codes or engines reaches a child.
+    assert "hy" not in message and "model" not in message.lower()
 
 
 def test_audit_trail_records_creation_generation_and_deletion(client, created_voice, app):

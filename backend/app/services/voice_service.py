@@ -32,7 +32,7 @@ from app.repositories.audit_repo import AuditRepository
 from app.repositories.generation_repo import GenerationRepository
 from app.repositories.voice_repo import VoiceRepository
 from app.schemas.voice import CONSENT_STATEMENT, VoiceCreateForm
-from app.services.language import is_supported
+from app.services.language import can_voice_speak, unsupported_voice_message
 from app.services.storage import LocalStorage
 
 logger = logging.getLogger(__name__)
@@ -75,10 +75,11 @@ class VoiceService:
         if not audio_bytes:
             raise AudioValidationError("No audio was uploaded.")
 
-        if not is_supported(
-            self.engine, form.language, include_armenian=self.settings.enable_experimental_armenian
-        ):
-            raise ValidationError(f"Language '{form.language}' is not supported.")
+        # A cloned voice is only useful in a language the cloning model can
+        # actually speak -- creating one tagged "hy" would build a profile
+        # that every narration request then refuses.
+        if not can_voice_speak(self.engine, is_cloned=True, language=form.language):
+            raise ValidationError(unsupported_voice_message(form.language))
 
         if self.voices.count() >= self.settings.max_voices:
             raise QuotaExceededError(

@@ -11,7 +11,7 @@ from app.schemas.common import ApiModel
 #: Kept intentionally small: this is a children's-story generator, not an
 #: open-ended writing tool, so the surface area the model has to handle (and
 #: that a caller can misuse) stays narrow.
-StoryLanguage = Literal["en", "hy"]
+StoryLanguage = Literal["en", "hy", "ru"]
 StoryLength = Literal["short", "medium", "long"]
 StoryAgeGroup = Literal["3-5", "6-8", "9-12"]
 StoryTone = Literal["magical", "funny", "adventure", "educational", "bedtime"]

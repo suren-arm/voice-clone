@@ -16,6 +16,8 @@ import shutil
 import subprocess
 from pathlib import Path
 
+import soundfile as sf
+
 logger = logging.getLogger(__name__)
 
 _ASSETS_DIR = Path(__file__).resolve().parent.parent / "backend" / "app" / "assets" / "ambience"
@@ -34,7 +36,14 @@ BACKGROUND_SOUNDS: dict[str, Path] = {
 #: at this fraction of the narration's level -- "the narration must stay
 #: louder and clearer than the background" is a product requirement, not a
 #: suggestion, so it is enforced here rather than trusted to the frontend.
-_MAX_BACKGROUND_GAIN = 0.55
+#:
+#: Lowered from 0.55 when the ambience tracks were found to be masking the
+#: narration: 0.55 was a ceiling at which even a well-behaved track competes
+#: with speech, and it existed because it was the only safeguard. It is no
+#: longer the only one -- the tracks now stay out of the speech band (see
+#: scripts/generate_ambience.py) and the mix ducks them under narration -- so
+#: the ceiling can be what it should always have been.
+_MAX_BACKGROUND_GAIN = 0.25
 
 
 class AudioMixError(RuntimeError):
@@ -78,6 +87,48 @@ def mix_with_background(
     # and ffmpeg cannot safely read and write the same file at once.
     tmp_out = out_path.with_suffix(out_path.suffix + ".mixing.wav")
 
+    # Match the narration's own rate. Without this, ffmpeg resolves the rate
+    # mismatch between narration and ambience however it likes -- a 22.05 kHz
+    # espeak narration silently came out at 24 kHz, disagreeing with the
+    # sample_rate this generation is recorded as having.
+    narration_rate = sf.info(str(narration_path)).samplerate
+
+    # The filter graph, and why each stage is here:
+    #
+    #   [0:a] narration --asplit--> [narr]  (the one and only audio in the mix)
+    #                           \-> [key]   (control signal, never mixed in)
+    #   [1:a] ambience  --volume--> [bg] --sidechaincompress(keyed by [key])-->
+    #                                        [duck] --\
+    #                                                  amix --> [aout]
+    #                                        [narr] --/
+    #
+    # sidechaincompress pulls the ambience down while the narrator is
+    # speaking and lets it back up in the gaps, which is what keeps speech
+    # intelligible regardless of what the ambience track contains. Note the
+    # asplit: [key] only ever steers the compressor. If it reached amix the
+    # narration would be summed with a copy of itself -- the classic way to
+    # manufacture exactly the echo this function is meant to avoid.
+    duck = (
+        "sidechaincompress="
+        "threshold=0.02:"  # duck as soon as there is speech at all
+        "ratio=6:"
+        "attack=20:"  # ms -- fast enough to catch a word's onset
+        "release=400:"  # ms -- slow enough not to pump between words
+        "makeup=1"
+    )
+    filter_complex = (
+        f"[0:a]aformat=sample_fmts=fltp:sample_rates={narration_rate}:channel_layouts=mono,"
+        "asplit=2[narr][key];"
+        f"[1:a]aformat=sample_fmts=fltp:sample_rates={narration_rate}:channel_layouts=mono,"
+        f"volume={gain:.4f}[bg];"
+        f"[bg][key]{duck}[duck];"
+        "[narr][duck]amix=inputs=2:duration=first:dropout_transition=0:normalize=0[mixed];"
+        # Mixing two signals can push peaks past full scale. Limit rather than
+        # attenuate everything: the narration keeps its level and only the
+        # overshoot is caught.
+        "[mixed]alimiter=limit=0.97:level=disabled[aout]"
+    )
+
     cmd = [
         "ffmpeg",
         "-y",
@@ -92,14 +143,13 @@ def mix_with_background(
         "-i",
         str(track_path),
         "-filter_complex",
-        (
-            f"[1:a]volume={gain:.4f}[bg];"
-            "[0:a][bg]amix=inputs=2:duration=first:dropout_transition=0:normalize=0[aout]"
-        ),
+        filter_complex,
         "-map",
         "[aout]",
         "-ac",
         "1",
+        "-ar",
+        str(narration_rate),
         str(tmp_out),
     ]
     try:

@@ -19,9 +19,16 @@ from ai.espeak_engine import (
 pytestmark = pytest.mark.skipif(not espeak_available(), reason="espeak-ng is not installed")
 
 
-def test_catalog_covers_english_and_armenian():
+def test_catalog_covers_every_app_language():
+    """A built-in voice for each of en/hy/ru is what makes all three usable.
+
+    The cloning model is English-only in production (turbo), so these are the
+    voices that actually deliver Armenian and Russian.
+    """
+    from app.services.language import APP_LANGUAGE_CODES
+
     languages = {spec.language for spec in DEFAULT_VOICES}
-    assert languages == {"en", "hy"}
+    assert languages == set(APP_LANGUAGE_CODES) == {"en", "hy", "ru"}
 
 
 def test_catalog_ids_are_unique():

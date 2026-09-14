@@ -15,6 +15,7 @@ from app.services.ai_providers.base import StoryPrompt
 _LANGUAGE_NAMES: dict[str, str] = {
     "en": "English",
     "hy": "Armenian (Հայերեն, Eastern Armenian as spoken in Armenia)",
+    "ru": "Russian (Русский, as spoken in Russia)",
 }
 
 #: Target word count and a matching output-token ceiling per length tier.
@@ -51,12 +52,25 @@ _BASE_SYSTEM_INSTRUCTION = (
     "Start with a single short title line, then a blank line, then the story."
 )
 
-_ARMENIAN_INSTRUCTION = (
-    " Write the ENTIRE story directly and fluently in Armenian, using Armenian "
-    "script throughout -- do not draft it in English and translate, and do not "
-    "mix English words or sentences into the story. Do not unnecessarily "
-    "translate or anglicize the character names the user supplied."
-)
+#: Generating directly in the target language beats drafting in English and
+#: translating: translation flattens idiom and, in practice, leaks English
+#: sentences into the output. Each non-English language gets an explicit
+#: instruction saying so, naming its own script.
+_NATIVE_SCRIPT_INSTRUCTION: dict[str, str] = {
+    "hy": (
+        " Write the ENTIRE story directly and fluently in Armenian, using Armenian "
+        "script throughout -- do not draft it in English and translate, and do not "
+        "mix English words or sentences into the story. Do not unnecessarily "
+        "translate or anglicize the character names the user supplied."
+    ),
+    "ru": (
+        " Write the ENTIRE story directly and fluently in Russian, using Cyrillic "
+        "script throughout -- do not draft it in English and translate, do not "
+        "transliterate Russian into Latin letters, and do not mix English words or "
+        "sentences into the story. Do not unnecessarily translate or anglicize the "
+        "character names the user supplied."
+    ),
+}
 
 
 class StoryPromptBuilder:
@@ -70,8 +84,9 @@ class StoryPromptBuilder:
         age = _AGE_GUIDANCE[request.age_group]
 
         system = _BASE_SYSTEM_INSTRUCTION + f" Write the ENTIRE story natively in {language_name}."
-        if request.language == "hy":
-            system += _ARMENIAN_INSTRUCTION
+        native_instruction = _NATIVE_SCRIPT_INSTRUCTION.get(request.language)
+        if native_instruction:
+            system += native_instruction
 
         user = (
             f"Main characters: {request.characters}\n"
