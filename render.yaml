@@ -110,8 +110,6 @@ services:
         value: "true"
       - key: RATE_LIMIT_ENABLED
         value: "true"
-      - key: ENABLE_EXPERIMENTAL_ARMENIAN
-        value: "true"
 
       # "Create Fairy Tale" is provider-independent (see
       # backend/app/services/ai_providers/ and README.md's AI Providers section): every

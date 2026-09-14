@@ -136,7 +136,6 @@ jobs:
               "MAX_VOICES": "100",
               "REQUIRE_CONSENT": "true",
               "RATE_LIMIT_ENABLED": "true",
-              "ENABLE_EXPERIMENTAL_ARMENIAN": "true",
           }
           cors_origins = os.environ.get("CORS_ORIGINS", "").strip()
           if cors_origins:

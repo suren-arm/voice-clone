@@ -140,17 +140,22 @@ Honestly: **an Armenian-accented approximation in the cloned timbre.**
   them.
 
 It is good enough to be recognisably Armenian and useful for demos and personal
-use. It is not good enough to ship to Armenian speakers as a product feature,
-which is why it is flagged rather than presented as support.
+use. It is not good enough to ship to Armenian speakers as a product feature.
 
-### Turning it off
+### It is no longer in the speech path
 
-```bash
-ENABLE_EXPERIMENTAL_ARMENIAN=false
-```
+This bridge used to be reachable through `POST /api/v1/speech` behind an
+`ENABLE_EXPERIMENTAL_ARMENIAN` flag. Both the bridge and the flag were removed
+from that path: espeak-ng's `hy`/`hyw` voices speak Armenian *natively* and the
+UI offers them, so the transliteration was strictly worse than the supported
+option while still being one API call away. Asking a cloned voice for Armenian
+now returns a plain refusal — *"This voice cannot speak Հայերեն. Please choose
+another voice."* — and `hy` stays in `GET /system/info` with
+`supportsClonedVoice: false`, which is what the UI filters on.
 
-`hy` then disappears from `GET /system/info`, from the UI language dropdowns,
-and is rejected with `unsupported_language` by the API. Nothing else changes.
+`armenian_ipa()` and `transliterate()` remain in `ai/armenian.py` as the
+starting point for the fine-tuning work described below, and so the quality of
+such a bridge can be inspected directly.
 
 ---
 

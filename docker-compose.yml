@@ -32,7 +32,6 @@ services:
       PRELOAD_MODEL: ${PRELOAD_MODEL:-false}
       HF_HOME: /cache/huggingface
       MAX_TEXT_CHARS: ${MAX_TEXT_CHARS:-2000}
-      ENABLE_EXPERIMENTAL_ARMENIAN: ${ENABLE_EXPERIMENTAL_ARMENIAN:-true}
       # Fairy-tale generation (see README.md's "AI Providers" section): none
       # of these is required, "Create Fairy Tale" works with any subset
       # configured. Compose only forwards variables listed here -- an unset

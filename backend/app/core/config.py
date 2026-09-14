@@ -73,9 +73,6 @@ class Settings(BaseSettings):
     rate_limit_speech_per_hour: int = 120
     rate_limit_global_per_minute: int = 240
 
-    # -- experimental ------------------------------------------------------
-    enable_experimental_armenian: bool = True
-
     # -- fairy-tale generation: multi-provider AI text generation ----------
     # None of these is mandatory -- StoryService works with any subset
     # configured, via AiProviderRegistry (app/services/ai_providers/). Model

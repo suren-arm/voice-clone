@@ -32,7 +32,6 @@ def settings(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setenv("DATABASE_URL", f"sqlite:///{tmp_path / 'test.db'}")
     monkeypatch.setenv("RATE_LIMIT_ENABLED", "false")
     monkeypatch.setenv("LOG_LEVEL", "WARNING")
-    monkeypatch.setenv("ENABLE_EXPERIMENTAL_ARMENIAN", "true")
 
     from app.core.config import get_settings
 

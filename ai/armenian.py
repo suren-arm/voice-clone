@@ -26,8 +26,15 @@ prefer it.
 
 This is an approximation, not Armenian TTS. Expect a noticeable foreign accent,
 wrong stress placement (Armenian stresses the last syllable; Russian does not),
-and occasional mispronunciation of consonant clusters. It is exposed behind
-``ENABLE_EXPERIMENTAL_ARMENIAN`` and surfaced in the UI with a warning.
+and occasional mispronunciation of consonant clusters.
+
+**Nothing in the speech path calls this.** It used to: a cloned voice asked
+for Armenian was transliterated through here so the model could approximate
+it. That was removed, because espeak-ng's ``hy``/``hyw`` voices speak Armenian
+natively and are offered instead -- an approximation that is strictly worse
+than the supported path should not be reachable. This module stays as the
+documented starting point for the fine-tuning work below, and as a way to
+inspect what such a bridge actually produces.
 
 The production path is documented in ``docs/ARMENIAN.md``: fine-tune Chatterbox
 on Armenian speech with tokenizer vocabulary extension.

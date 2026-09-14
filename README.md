@@ -298,7 +298,7 @@ MMS-TTS; why Russian and not Latin for the transliteration bridge; the
 fine-tuning path to real cloning support): **[docs/ARMENIAN.md](docs/ARMENIAN.md)**.
 
 Disable the experimental cloned-voice bridge (API-only; the UI never exposed
-it) with `ENABLE_EXPERIMENTAL_ARMENIAN=false`.
+it).
 
 ---
 
@@ -666,7 +666,6 @@ the API from a browser.
 | `MAX_TEXT_CHARS` | 2000 | Caps worst-case request latency |
 | `REQUIRE_CONSENT` | `true` | Do not disable in production |
 | `RATE_LIMIT_ENABLED` | `true` | |
-| `ENABLE_EXPERIMENTAL_ARMENIAN` | `true` | API-only; the UI never exposes cloned+Armenian regardless |
 | `DATABASE_URL` | `sqlite:///storage/voice_studio.db` | Any SQLAlchemy URL |
 | `STORAGE_DIR` | `storage` | Recordings, generated audio, the SQLite file |
 
