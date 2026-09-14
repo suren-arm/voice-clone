@@ -11,10 +11,13 @@ test('the whole journey: create a voice, generate speech, download it, delete th
   // --- Home ---------------------------------------------------------------
   await page.goto('/');
   await expect(page.getByRole('heading', { name: 'Voice Story Studio', level: 1 })).toBeVisible();
+  // Engine/device detail is deliberately tucked behind a disclosure so the
+  // front door stays child-facing -- open it to assert the same thing.
+  await page.getByText('Studio status').click();
   await expect(page.getByTestId('system-status')).toContainText('mock');
 
   // --- Create voice: upload path ------------------------------------------
-  await page.getByRole('link', { name: 'Create Voice' }).first().click();
+  await page.getByRole('link', { name: 'Make My Own Voice' }).first().click();
   await expect(page).toHaveURL(/\/voices\/new$/);
 
   await page.getByTestId('mode-upload').click();
@@ -56,18 +59,18 @@ test('the whole journey: create a voice, generate speech, download it, delete th
   expect(download.suggestedFilename()).toMatch(/^gen_e2e\d+\.wav$/);
 
   // --- History ------------------------------------------------------------
-  await page.getByRole('link', { name: 'History' }).click();
+  await page.getByRole('link', { name: 'My Recordings' }).first().click();
   await expect(page.getByTestId('generation-list')).toContainText('Hello. This is my cloned voice.');
 
   // --- Delete cascades ----------------------------------------------------
-  await page.getByRole('link', { name: 'My Voices' }).click();
+  await page.getByRole('link', { name: 'My Voices' }).first().click();
   await expect(page.getByTestId('voice-list')).toContainText('E2E Voice');
 
   page.once('dialog', (dialog) => dialog.accept());
   await page.getByRole('button', { name: 'Delete' }).first().click();
   await expect(page.getByText('No voices yet')).toBeVisible();
 
-  await page.getByRole('link', { name: 'History' }).click();
+  await page.getByRole('link', { name: 'My Recordings' }).first().click();
   await expect(page.getByText('Nothing generated yet')).toBeVisible();
 });
 
@@ -134,7 +137,7 @@ test('the layout works at phone width', async ({ page }) => {
   await page.goto('/');
 
   await expect(page.getByRole('heading', { name: 'Voice Story Studio', level: 1 })).toBeVisible();
-  await expect(page.getByRole('link', { name: 'Create Voice' }).first()).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Make My Own Voice' }).first()).toBeVisible();
 
   // No horizontal overflow: the body must not be wider than the viewport.
   const overflow = await page.evaluate(

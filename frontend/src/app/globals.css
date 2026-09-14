@@ -1,44 +1,65 @@
 /* =============================================================================
-   AI Voice Studio design system.
+   Voice Story Studio design system.
 
    Hand-written CSS with custom properties rather than a utility framework: the
    surface is small, it keeps the dependency tree (and therefore CI) minimal,
    and it makes the dark-mode story a single block of variable overrides.
+
+   Visual direction: a storybook, not an admin panel. Warm lavender paper,
+   one friendly purple for actions, and four "joy" hues used *one per feature*
+   so the app reads as colourful-but-structured rather than noisy. Every
+   foreground token is chosen to clear WCAG AA (4.5:1) on its own background --
+   playful is not an excuse for unreadable, and children's eyes are the ones
+   reading it.
    ========================================================================== */
 
 :root {
   color-scheme: light dark;
 
-  /* Palette */
-  --bg: #f7f7f9;
+  /* Palette -- warm "storybook paper" rather than cold dashboard grey. */
+  --bg: #faf8ff;
   --bg-elevated: #ffffff;
-  --bg-sunken: #eeeef2;
-  --border: #dededf;
-  --border-strong: #c6c6cb;
+  --bg-sunken: #f1edfb;
+  --border: #e5ddf7;
+  --border-strong: #c9bced;
 
-  --text: #17171a;
-  --text-muted: #63636b;
-  --text-subtle: #8a8a93;
+  --text: #211b33;
+  --text-muted: #5c5470;
+  --text-subtle: #857c9c;
 
-  --accent: #4338ca;
-  --accent-hover: #3730a3;
-  --accent-soft: #eef2ff;
+  --accent: #6d46e8;
+  --accent-hover: #5a34d4;
+  --accent-soft: #f0ebff;
   --accent-contrast: #ffffff;
+
+  /* Feature hues. Each screen/card owns exactly one, so colour carries
+     meaning (which feature am I in?) instead of decoration. */
+  --joy-grape: #6d46e8;
+  --joy-grape-soft: #f0ebff;
+  --joy-sky: #1f6fbf;
+  --joy-sky-soft: #e7f2fd;
+  --joy-sun: #96650a;
+  --joy-sun-soft: #fff4dd;
+  --joy-mint: #0f7a5f;
+  --joy-mint-soft: #e2f7f0;
+  --joy-coral: #c93b53;
+  --joy-coral-soft: #ffecef;
 
   --danger: #b42318;
   --danger-soft: #fef3f2;
   --success: #15803d;
   --success-soft: #f0fdf4;
-  --warning: #a16207;
-  --warning-soft: #fefce8;
+  --warning: #8a5a00;
+  --warning-soft: #fff6e3;
   --record: #dc2626;
 
-  /* Shape */
-  --radius-sm: 6px;
-  --radius: 10px;
-  --radius-lg: 16px;
-  --shadow-sm: 0 1px 2px rgb(16 16 20 / 6%);
-  --shadow: 0 4px 16px rgb(16 16 20 / 8%);
+  /* Shape -- rounder than a dashboard, soft enough to feel friendly. */
+  --radius-sm: 10px;
+  --radius: 14px;
+  --radius-lg: 22px;
+  --radius-pill: 999px;
+  --shadow-sm: 0 2px 6px rgb(74 47 142 / 7%);
+  --shadow: 0 10px 30px rgb(74 47 142 / 12%);
 
   /* Rhythm */
   --space-1: 4px;
@@ -49,27 +70,53 @@
   --space-6: 32px;
   --space-7: 48px;
 
-  --font: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  /* Armenian matters as much as English here, so the stack names fonts that
+     actually carry Armenian glyphs before falling back to the generic UI
+     face -- no webfont download, just better system-font selection. */
+  --font:
+    ui-rounded, 'SF Pro Rounded', ui-sans-serif, system-ui, -apple-system, 'Segoe UI Variable',
+    'Segoe UI', Roboto, 'Noto Sans Armenian', 'Noto Sans', 'DejaVu Sans', Helvetica, Arial,
+    sans-serif;
   --font-mono: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace;
-  --max-width: 960px;
+  /* Long-form story/book text: a serif reads better for paragraphs, and both
+     fallbacks below carry Armenian. */
+  --font-reading: 'Iowan Old Style', Georgia, 'Noto Serif Armenian', 'Noto Serif', serif;
+  --max-width: 1040px;
+
+  /* Minimum comfortable touch target (WCAG 2.5.5) -- children tap less
+     precisely than adults, so this is a floor, not a suggestion. */
+  --tap: 44px;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --bg: #101013;
-    --bg-elevated: #1a1a1f;
-    --bg-sunken: #0a0a0c;
-    --border: #2c2c33;
-    --border-strong: #3d3d45;
+    /* "Night-time story" rather than pure black: a deep plum keeps the warm
+       identity while staying comfortable for evening/bedtime reading. */
+    --bg: #14111d;
+    --bg-elevated: #1e1a2b;
+    --bg-sunken: #100d18;
+    --border: #332c47;
+    --border-strong: #4a4067;
 
-    --text: #f2f2f4;
-    --text-muted: #a3a3ad;
-    --text-subtle: #7c7c86;
+    --text: #f4f1fb;
+    --text-muted: #b7aed0;
+    --text-subtle: #8d84a8;
 
-    --accent: #818cf8;
-    --accent-hover: #a5b4fc;
-    --accent-soft: #1e1b4b;
-    --accent-contrast: #14141a;
+    --accent: #b9a4ff;
+    --accent-hover: #cdbcff;
+    --accent-soft: #2a2141;
+    --accent-contrast: #1a1526;
+
+    --joy-grape: #b9a4ff;
+    --joy-grape-soft: #2a2141;
+    --joy-sky: #86c5f5;
+    --joy-sky-soft: #152736;
+    --joy-sun: #f0c674;
+    --joy-sun-soft: #302614;
+    --joy-mint: #7bdcbd;
+    --joy-mint-soft: #102b25;
+    --joy-coral: #ff9fae;
+    --joy-coral-soft: #331a20;
 
     --danger: #fda29b;
     --danger-soft: #2b1513;
@@ -79,8 +126,8 @@
     --warning-soft: #2a2210;
     --record: #f87171;
 
-    --shadow-sm: 0 1px 2px rgb(0 0 0 / 40%);
-    --shadow: 0 4px 20px rgb(0 0 0 / 50%);
+    --shadow-sm: 0 2px 6px rgb(0 0 0 / 45%);
+    --shadow: 0 10px 30px rgb(0 0 0 / 55%);
   }
 }
 
@@ -100,21 +147,37 @@ body {
   background: var(--bg);
   color: var(--text);
   font-family: var(--font);
-  font-size: 15px;
-  line-height: 1.55;
+  /* 16px, not 15: this is read by children and by parents on phones. */
+  font-size: 16px;
+  /* Extra leading gives Armenian's taller glyphs room to breathe without
+     colliding with the line above. */
+  line-height: 1.6;
   -webkit-font-smoothing: antialiased;
+}
+
+/* A soft aurora behind the page -- static, so it costs nothing to animate
+   and cannot distract. Fixed so content scrolls over it like paper. */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(60rem 30rem at 12% -8%, var(--joy-grape-soft), transparent 70%),
+    radial-gradient(48rem 26rem at 96% 4%, var(--joy-sky-soft), transparent 70%);
 }
 
 h1, h2, h3, h4 {
   margin: 0;
   line-height: 1.25;
-  font-weight: 650;
+  font-weight: 700;
   letter-spacing: -0.015em;
 }
 
-h1 { font-size: 1.75rem; }
-h2 { font-size: 1.25rem; }
-h3 { font-size: 1.0625rem; }
+h1 { font-size: 2rem; }
+h2 { font-size: 1.375rem; }
+h3 { font-size: 1.125rem; }
 
 p { margin: 0; }
 
@@ -271,25 +334,32 @@ a:hover { text-decoration: underline; }
   align-items: center;
   justify-content: center;
   gap: var(--space-2);
-  padding: 9px 16px;
-  border-radius: var(--radius);
+  min-height: var(--tap);
+  padding: 10px 18px;
+  border-radius: var(--radius-pill);
   border: 1px solid transparent;
   background: var(--bg-elevated);
   color: var(--text);
   font: inherit;
   font-size: 0.9375rem;
-  font-weight: 550;
+  font-weight: 600;
   cursor: pointer;
-  transition: background 120ms ease, border-color 120ms ease, opacity 120ms ease;
+  transition: background 140ms ease, border-color 140ms ease, opacity 140ms ease,
+    transform 140ms ease, box-shadow 140ms ease;
   white-space: nowrap;
 }
 .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn:active:not(:disabled) { transform: translateY(1px); }
 
 .btn--primary {
   background: var(--accent);
   color: var(--accent-contrast);
+  box-shadow: 0 4px 14px color-mix(in srgb, var(--accent) 34%, transparent);
 }
-.btn--primary:hover:not(:disabled) { background: var(--accent-hover); }
+.btn--primary:hover:not(:disabled) {
+  background: var(--accent-hover);
+  box-shadow: 0 6px 18px color-mix(in srgb, var(--accent) 42%, transparent);
+}
 
 .btn--secondary {
   background: var(--bg-elevated);
@@ -331,13 +401,16 @@ a:hover { text-decoration: underline; }
 .select,
 .textarea {
   width: 100%;
-  padding: 10px 12px;
-  border: 1px solid var(--border-strong);
+  min-height: var(--tap);
+  padding: 11px 14px;
+  border: 2px solid var(--border-strong);
   border-radius: var(--radius);
   background: var(--bg-elevated);
   color: var(--text);
   font: inherit;
-  font-size: 0.9375rem;
+  /* 16px prevents iOS Safari from zooming the page on focus -- a real
+     usability problem on the phones parents hand to children. */
+  font-size: 1rem;
 }
 .input:focus,
 .select:focus,
@@ -651,38 +724,89 @@ a:hover { text-decoration: underline; }
   font-size: 0.875rem;
 }
 
+/* ---------- Home feature cards ----------
+   Desktop 4-up / tablet 2-up / phone 1-up comes from auto-fit rather than
+   breakpoints, so there is no width where a card is awkwardly squeezed. */
+
 .home-actions {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr));
   gap: var(--space-4);
 }
+
 .tile {
+  --tile-hue: var(--joy-grape);
+  --tile-hue-soft: var(--joy-grape-soft);
+  position: relative;
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
   padding: var(--space-5);
-  border: 1px solid var(--border);
+  border: 2px solid var(--border);
   border-radius: var(--radius-lg);
   background: var(--bg-elevated);
   color: var(--text);
   box-shadow: var(--shadow-sm);
-  transition: border-color 120ms ease, transform 120ms ease;
+  overflow: hidden;
+  transition: border-color 160ms ease, transform 160ms ease, box-shadow 160ms ease;
 }
-.tile:hover {
+.tile:hover,
+.tile:focus-visible {
   text-decoration: none;
-  border-color: var(--accent);
-  transform: translateY(-1px);
+  border-color: var(--tile-hue);
+  transform: translateY(-3px);
+  box-shadow: var(--shadow);
 }
-.tile__icon { font-size: 1.4rem; }
-.tile__title { font-weight: 620; }
-.tile__desc { font-size: 0.875rem; color: var(--text-muted); }
+.tile__icon {
+  display: grid;
+  place-items: center;
+  width: 52px;
+  height: 52px;
+  border-radius: var(--radius);
+  background: var(--tile-hue-soft);
+  font-size: 1.6rem;
+  line-height: 1;
+}
+.tile__title { font-weight: 700; font-size: 1.0625rem; }
+.tile__desc { font-size: 0.9375rem; color: var(--text-muted); }
+.tile__cta {
+  margin-top: auto;
+  padding-top: var(--space-2);
+  font-weight: 650;
+  font-size: 0.9375rem;
+  color: var(--tile-hue);
+}
+
+/* One hue per feature, so colour tells you where you are. */
+.tile--grape { --tile-hue: var(--joy-grape); --tile-hue-soft: var(--joy-grape-soft); }
+.tile--sky   { --tile-hue: var(--joy-sky);   --tile-hue-soft: var(--joy-sky-soft); }
+.tile--sun   { --tile-hue: var(--joy-sun);   --tile-hue-soft: var(--joy-sun-soft); }
+.tile--mint  { --tile-hue: var(--joy-mint);  --tile-hue-soft: var(--joy-mint-soft); }
+.tile--coral { --tile-hue: var(--joy-coral); --tile-hue-soft: var(--joy-coral-soft); }
 
 .tile--primary {
-  background: linear-gradient(155deg, color-mix(in srgb, var(--accent) 10%, var(--bg-elevated)), var(--bg-elevated));
-  border-color: color-mix(in srgb, var(--accent) 35%, var(--border));
+  background: linear-gradient(160deg, var(--tile-hue-soft), var(--bg-elevated) 62%);
+  border-color: color-mix(in srgb, var(--tile-hue) 28%, var(--border));
 }
-.tile--primary .tile__icon { font-size: 1.75rem; }
-.tile--primary .tile__title { font-size: 1.05rem; }
+.tile--primary .tile__icon { width: 60px; height: 60px; font-size: 1.9rem; }
+.tile--primary .tile__title { font-size: 1.1875rem; }
+
+/* ---------- Hero ---------- */
+
+.hero {
+  text-align: center;
+  padding: var(--space-6) var(--space-4) var(--space-2);
+}
+.hero__title {
+  font-size: clamp(2rem, 5vw, 2.75rem);
+  line-height: 1.12;
+}
+.hero__lede {
+  margin: var(--space-3) auto 0;
+  max-width: 46ch;
+  color: var(--text-muted);
+  font-size: 1.0625rem;
+}
 
 .stat-grid {
   display: grid;
@@ -755,10 +879,64 @@ a:hover { text-decoration: underline; }
   .shell__main { padding: var(--space-5) var(--space-3) var(--space-6); }
   .shell__header-inner { padding: var(--space-3); gap: var(--space-3); }
   .card { padding: var(--space-4); border-radius: var(--radius); }
-  h1 { font-size: 1.4rem; }
-  .nav { width: 100%; margin-left: 0; justify-content: space-between; }
-  .nav__link { flex: 1; text-align: center; padding: var(--space-2); }
+  h1 { font-size: 1.6rem; }
+  .hero { padding: var(--space-5) var(--space-2) var(--space-2); }
+  /* The nav scrolls sideways rather than wrapping into a tall block that
+     pushes the actual page off-screen on a phone. */
+  .nav {
+    width: 100%;
+    margin-left: 0;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+  }
+  .nav::-webkit-scrollbar { display: none; }
+  .nav__link { flex: 0 0 auto; text-align: center; padding: var(--space-2) var(--space-3); }
   .list__item { flex-direction: column; align-items: stretch; gap: var(--space-3); }
   .recorder__timer { font-size: 1.85rem; }
   .btn--block-mobile { width: 100%; }
+  /* Stacked actions get full width so they are easy to hit with a thumb. */
+  .row--end .btn, .row--between .btn { flex: 1 1 auto; }
+}
+
+/* ---------- Storybook reading surface ----------
+   Used for generated stories and extracted book text: serif, generous
+   leading and a capped measure, because these are the only places in the
+   app where someone reads more than a sentence at a time. */
+
+.storybook {
+  font-family: var(--font-reading);
+  font-size: 1.0625rem;
+  line-height: 1.75;
+  white-space: pre-wrap;
+  max-width: 68ch;
+  padding: var(--space-5);
+  border-radius: var(--radius);
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--joy-sun-soft) 45%, var(--bg-elevated)), var(--bg-elevated));
+  border: 1px solid var(--border);
+  color: var(--text);
+}
+.storybook--editable {
+  font-family: var(--font-reading);
+  font-size: 1.0625rem;
+  line-height: 1.75;
+}
+
+/* ---------- Motion ----------
+   Delight is opt-out: anyone who has asked their OS for less motion gets a
+   still page, not a slightly-slower one. */
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+  .tile:hover,
+  .tile:focus-visible { transform: none; }
 }

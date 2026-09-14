@@ -65,7 +65,7 @@ export function VoiceAndBackgroundFields({
 
   return (
     <div className="stack">
-      <Field label="Voice Source">
+      <Field label="Whose voice?">
         {() => (
           <div className="segmented" role="group" aria-label="Voice source">
             <button
@@ -76,7 +76,7 @@ export function VoiceAndBackgroundFields({
               onClick={() => onVoiceSourceChange('cloned')}
               data-testid="voice-source-cloned"
             >
-              My Cloned Voice
+              🎤 My Voice
             </button>
             <button
               type="button"
@@ -86,7 +86,7 @@ export function VoiceAndBackgroundFields({
               onClick={() => onVoiceSourceChange('default')}
               data-testid="voice-source-default"
             >
-              Default Voice
+              🧑‍🎨 A Studio Voice
             </button>
           </div>
         )}
@@ -131,8 +131,8 @@ export function VoiceAndBackgroundFields({
           label="Voice"
           hint={
             defaultVoicesForLanguage.length === 0
-              ? 'No default voice is available for this language yet.'
-              : 'A built-in synthetic voice — no recording required.'
+              ? 'No studio voice for this language yet.'
+              : 'A ready-made voice — no recording needed.'
           }
         >
           {(props) => (
@@ -155,7 +155,7 @@ export function VoiceAndBackgroundFields({
         </Field>
       )}
 
-      <Field label="Background">
+      <Field label="Background sound">
         {() => (
           <div className="segmented" role="group" aria-label="Background sound">
             {BACKGROUND_SOUND_OPTIONS.map((option) => (

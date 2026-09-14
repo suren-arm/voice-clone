@@ -15,7 +15,7 @@ interface GenerationResultProps {
 
 export function GenerationResult({ generation, onGenerateAgain }: GenerationResultProps) {
   return (
-    <Card title="Generated audio" hint={`${generation.engine} · ${generation.sampleRate / 1000} kHz`}>
+    <Card title="🎵 Your recording is ready!" hint={`${generation.engine} · ${generation.sampleRate / 1000} kHz`}>
       <div className="stack" data-testid="generation-result">
         {generation.notice && (
           <Callout kind="warning" title="Experimental output">
@@ -32,7 +32,7 @@ export function GenerationResult({ generation, onGenerateAgain }: GenerationResu
         <AudioPlayer
           src={generationAudioUrl(generation)}
           durationSeconds={generation.durationSeconds}
-          label="the generated speech"
+          label="your recording"
         />
 
         <div className="stat-grid">
@@ -68,7 +68,7 @@ export function GenerationResult({ generation, onGenerateAgain }: GenerationResu
 
           <div className="row">
             <Button variant="secondary" onClick={onGenerateAgain} data-testid="generate-again">
-              Generate again
+              ↺ Make another
             </Button>
             {/* A plain link, not fetch+blob: the browser streams it straight to
                 disk and the Content-Disposition header names the file. */}
@@ -78,7 +78,7 @@ export function GenerationResult({ generation, onGenerateAgain }: GenerationResu
               download={`${generation.id}.wav`}
               data-testid="download-wav"
             >
-              Download WAV
+              ⬇ Download
             </a>
           </div>
         </div>

@@ -7,7 +7,7 @@ test.beforeEach(async ({ page }) => {
 
 test('upload a PDF, preview it, narrate it, and play/download the result', async ({ page }) => {
   await page.goto('/');
-  await page.getByRole('link', { name: 'Book Reader' }).click();
+  await page.getByRole('link', { name: 'Read a Book' }).first().click();
   await expect(page).toHaveURL(/\/book-reader$/);
 
   // --- Upload -----------------------------------------------------------

@@ -49,7 +49,7 @@ export function SourceForm({ onLoaded }: SourceFormProps) {
 
   return (
     <div className="stack">
-      <Field label="Source">
+      <Field label="How would you like to open your book?">
         {() => (
           <div className="segmented" role="group" aria-label="Book source">
             <button
@@ -59,7 +59,7 @@ export function SourceForm({ onLoaded }: SourceFormProps) {
               onClick={() => setMode('upload')}
               data-testid="book-source-upload"
             >
-              Upload PDF
+              📄 Upload a PDF
             </button>
             <button
               type="button"
@@ -68,14 +68,14 @@ export function SourceForm({ onLoaded }: SourceFormProps) {
               onClick={() => setMode('url')}
               data-testid="book-source-url"
             >
-              Web Link
+              🔗 Open from a link
             </button>
           </div>
         )}
       </Field>
 
       {mode === 'upload' && (
-        <Field label="Choose PDF" hint="A PDF file from your device.">
+        <Field label="Choose your book" hint="Pick a PDF from this device.">
           {(props) => (
             <input
               {...props}
@@ -91,8 +91,8 @@ export function SourceForm({ onLoaded }: SourceFormProps) {
 
       {mode === 'url' && (
         <Field
-          label="Book / Article URL"
-          hint="A public http:// or https:// link to an article or a PDF -- not a local file path."
+          label="Paste a link"
+          hint="A public web page or PDF link (starting with http:// or https://)."
         >
           {(props) => (
             <input
@@ -119,7 +119,7 @@ export function SourceForm({ onLoaded }: SourceFormProps) {
           loading={loading}
           data-testid="load-book-submit"
         >
-          {loading ? 'Loading…' : 'Load Book'}
+          {loading ? '📖 Opening your book…' : '📖 Open My Book'}
         </Button>
       </div>
     </div>

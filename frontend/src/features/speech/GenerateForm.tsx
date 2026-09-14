@@ -118,7 +118,7 @@ export function GenerateForm({ initialVoiceId }: GenerateFormProps) {
 
   return (
     <div className="stack-5">
-      <Card title="Generate speech">
+      <Card title="🗣️ Speak My Text" hint="Type anything and hear it out loud.">
         <div className="stack">
           <Field label="Language">
             {(props) => (
@@ -140,7 +140,7 @@ export function GenerateForm({ initialVoiceId }: GenerateFormProps) {
           </Field>
 
           <Field
-            label="Text"
+            label="What should I say?"
             error={textError}
             counter={
               <span className={over ? 'counter counter--over' : 'counter'} data-testid="char-counter">
@@ -183,7 +183,7 @@ export function GenerateForm({ initialVoiceId }: GenerateFormProps) {
           <div className="row row--between">
             <span className="field__hint">
               {generating
-                ? 'Generating — this runs on the server and takes a few seconds.'
+                ? '🎙 Reading your text — this takes a few seconds…'
                 : info?.engine.watermarked
                   ? 'Generated audio carries an inaudible provenance watermark.'
                   : ''}
@@ -196,7 +196,7 @@ export function GenerateForm({ initialVoiceId }: GenerateFormProps) {
               loading={generating}
               data-testid="generate-submit"
             >
-              {generating ? 'Generating…' : 'Generate speech'}
+              {generating ? '🎙 Reading…' : '🔊 Read It Out Loud'}
             </Button>
           </div>
         </div>

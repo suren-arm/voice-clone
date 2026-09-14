@@ -171,7 +171,7 @@ export function BookReaderForm() {
         </Callout>
       )}
 
-      <Card title="Book Reader 📖">
+      <Card title="📖 Read a Book">
         <SourceForm onLoaded={handleLoaded} />
       </Card>
 
@@ -183,7 +183,7 @@ export function BookReaderForm() {
 
       {document && (
         <Card
-          title="Narrate"
+          title="Now let's read it"
           action={
             <div className="row">
               <Button variant="ghost" size="sm" onClick={() => applyPreset('standard')} data-testid="preset-standard">
@@ -230,7 +230,7 @@ export function BookReaderForm() {
 
             <div className="row row--between">
               <Button variant="ghost" onClick={() => void handleForget()} data-testid="forget-book">
-                Load a different book
+                📚 Choose another book
               </Button>
               <Button
                 variant="primary"
@@ -240,7 +240,7 @@ export function BookReaderForm() {
                 loading={narrating}
                 data-testid="narrate-book-submit"
               >
-                {narrating ? 'Narrating…' : 'Start Reading'}
+                {narrating ? '🎙 Reading…' : '▶ Start Reading'}
               </Button>
             </div>
           </div>

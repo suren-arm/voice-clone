@@ -57,15 +57,15 @@ export function BookPreview({ document, language, onLanguageChange }: BookPrevie
     <div className="stack">
       <div className="stat-grid">
         <div>
-          <div className="stat__label">Title</div>
+          <div className="stat__label">Book</div>
           <div className="stat__value">{document.title ?? 'Untitled'}</div>
         </div>
         <div>
-          <div className="stat__label">Source Type</div>
+          <div className="stat__label">Kind</div>
           <div className="stat__value">
-            {document.sourceType === 'pdf_upload' && 'PDF (uploaded)'}
-            {document.sourceType === 'pdf_url' && 'PDF (from link)'}
-            {document.sourceType === 'html_url' && 'Web article'}
+            {document.sourceType === 'pdf_upload' && 'PDF you uploaded'}
+            {document.sourceType === 'pdf_url' && 'PDF from a link'}
+            {document.sourceType === 'html_url' && 'Page from the web'}
           </div>
         </div>
         <div>
@@ -75,8 +75,8 @@ export function BookPreview({ document, language, onLanguageChange }: BookPrevie
       </div>
 
       <Field
-        label="Detected Language"
-        hint="Override this if the automatic detection guessed wrong -- narration uses whichever language is selected here."
+        label="What language is it in?"
+        hint="We guessed this from the text. Change it if we got it wrong."
       >
         {(props) => (
           <select
@@ -123,13 +123,13 @@ export function BookPreview({ document, language, onLanguageChange }: BookPrevie
           </div>
         </div>
 
-        {loading && <Spinner label="Loading section…" />}
+        {loading && <Spinner label="Turning the page…" />}
         {error && <Callout kind="error">{error}</Callout>}
         {!loading && !error && section && (
-          <div className="textarea" style={{ minHeight: 200, whiteSpace: 'pre-wrap' }} data-testid="preview-text">
+          <div className="storybook" style={{ minHeight: 200 }} data-testid="preview-text">
             {section.title && <strong>{section.title}</strong>}
             {section.title && <br />}
-            {section.text || <em>(This page has no extractable text.)</em>}
+            {section.text || <em>(There are no words to read on this page.)</em>}
           </div>
         )}
       </div>

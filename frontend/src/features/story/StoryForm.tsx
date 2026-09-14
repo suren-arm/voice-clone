@@ -142,7 +142,8 @@ export function StoryForm() {
   return (
     <div className="stack-5">
       <Card
-        title="Create Fairy Tale"
+        title="✨ Create Your Fairy Tale"
+        hint="Tell us who the story is about and where it happens."
         action={
           <Button variant="secondary" onClick={applyMagicalPreset} data-testid="magical-preset">
             ✨ Magical Story
@@ -150,35 +151,6 @@ export function StoryForm() {
         }
       >
         <div className="stack">
-          <Field
-            label="AI Provider"
-            hint={
-              provider === 'auto'
-                ? aiProviders?.autoResolvesTo
-                  ? `Auto currently uses ${aiProviders.providers.find((p) => p.id === aiProviders.autoResolvesTo)?.name ?? aiProviders.autoResolvesTo}.`
-                  : 'No AI provider is configured on this server yet.'
-                : undefined
-            }
-          >
-            {(props) => (
-              <select
-                {...props}
-                className="select"
-                value={provider}
-                onChange={(event) => setProvider(event.target.value)}
-                data-testid="ai-provider-select"
-              >
-                <option value="auto">Auto (recommended)</option>
-                {aiProviders?.providers.map((p) => (
-                  <option key={p.id} value={p.id} disabled={!p.available}>
-                    {p.name}
-                    {p.available ? '' : ' — Not configured'}
-                  </option>
-                ))}
-              </select>
-            )}
-          </Field>
-
           <Field label="Language">
             {(props) => (
               <select
@@ -197,7 +169,7 @@ export function StoryForm() {
             )}
           </Field>
 
-          <Field label="Main Characters">
+          <Field label="Who is in your story?">
             {(props) => (
               <input
                 {...props}
@@ -210,7 +182,7 @@ export function StoryForm() {
             )}
           </Field>
 
-          <Field label="Story Idea">
+          <Field label="What happens?">
             {(props) => (
               <textarea
                 {...props}
@@ -223,7 +195,7 @@ export function StoryForm() {
             )}
           </Field>
 
-          <Field label="Age Group">
+          <Field label="Who is it for?">
             {() => (
               <div className="segmented" role="group" aria-label="Age group">
                 {AGE_GROUP_OPTIONS.map((option) => (
@@ -242,7 +214,7 @@ export function StoryForm() {
             )}
           </Field>
 
-          <Field label="Story Length">
+          <Field label="How long?">
             {() => (
               <div className="segmented" role="group" aria-label="Story length">
                 {LENGTH_OPTIONS.map((option) => (
@@ -261,7 +233,7 @@ export function StoryForm() {
             )}
           </Field>
 
-          <Field label="Tone">
+          <Field label="What kind of story?">
             {(props) => (
               <select
                 {...props}
@@ -279,11 +251,50 @@ export function StoryForm() {
             )}
           </Field>
 
+          {/* Which model writes the story is a grown-up's concern, not a
+              child's first decision -- so it lives behind a disclosure with
+              a plain-language name, still one click away. */}
+          <details>
+            <summary className="field__label" style={{ cursor: 'pointer' }}>
+              Advanced settings
+            </summary>
+            <div style={{ marginTop: 'var(--space-3)' }}>
+              <Field
+                label="Story Helper"
+                hint={
+                  provider === 'auto'
+                    ? aiProviders?.autoResolvesTo
+                      ? `Right now this uses ${aiProviders.providers.find((p) => p.id === aiProviders.autoResolvesTo)?.name ?? aiProviders.autoResolvesTo}.`
+                      : 'No story helper is set up on this server yet.'
+                    : undefined
+                }
+              >
+                {(props) => (
+                  <select
+                    {...props}
+                    className="select"
+                    value={provider}
+                    onChange={(event) => setProvider(event.target.value)}
+                    data-testid="ai-provider-select"
+                  >
+                    <option value="auto">Pick for me (recommended)</option>
+                    {aiProviders?.providers.map((p) => (
+                      <option key={p.id} value={p.id} disabled={!p.available}>
+                        {p.name}
+                        {p.available ? '' : ' — not set up'}
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </Field>
+            </div>
+          </details>
+
           {storyError && <Callout kind="error">{storyError}</Callout>}
 
           <div className="row row--between">
             <span className="field__hint">
-              {generatingStory ? 'Writing your story — this can take a little while.' : ''}
+              {generatingStory ? '✨ Writing your story — this takes a moment…' : ''}
             </span>
             <Button
               variant="primary"
@@ -293,21 +304,24 @@ export function StoryForm() {
               loading={generatingStory}
               data-testid="generate-story-submit"
             >
-              {generatingStory ? 'Generating…' : 'Generate Fairy Tale'}
+              {generatingStory ? '✨ Writing…' : '✨ Create My Story'}
             </Button>
           </div>
         </div>
       </Card>
 
       {story && (
-        <Card title={story.title} hint={`${story.wordCount} words · written by ${story.providerName}`}>
+        <Card
+          title={`✨ ${story.title}`}
+          hint={`Your story is ready — ${story.wordCount} words. Change anything you like before you hear it.`}
+        >
           <div className="stack">
-            <Field label="Your story (edit freely before narrating)">
+            <Field label="Your story">
               {(props) => (
                 <textarea
                   {...props}
-                  className="textarea"
-                  style={{ minHeight: 260 }}
+                  className="textarea storybook--editable"
+                  style={{ minHeight: 280 }}
                   value={storyText}
                   onChange={(event) => setStoryText(event.target.value)}
                   data-testid="story-text-editor"
@@ -341,7 +355,7 @@ export function StoryForm() {
                 loading={narrating}
                 data-testid="narrate-story-submit"
               >
-                {narrating ? 'Narrating…' : 'Generate Audio'}
+                {narrating ? '🎙 Reading…' : '🔊 Read My Story'}
               </Button>
             </div>
           </div>

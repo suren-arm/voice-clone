@@ -4,13 +4,19 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import type { ReactNode } from 'react';
 
+/**
+ * Ordered the way someone actually uses the app -- the three things you can
+ * make come first, then the things you have already made. "Book Reader" was
+ * previously reachable only from the home page, which made it invisible from
+ * every other screen.
+ */
 const NAV = [
   { href: '/', label: 'Home' },
-  { href: '/generate', label: 'Text to Speech' },
-  { href: '/fairy-tale', label: 'Create Fairy Tale' },
-  { href: '/voices/new', label: 'Create Voice' },
+  { href: '/fairy-tale', label: '✨ Fairy Tale' },
+  { href: '/book-reader', label: '📖 Read a Book' },
+  { href: '/generate', label: '🗣️ Speak Text' },
   { href: '/voices', label: 'My Voices' },
-  { href: '/history', label: 'History' },
+  { href: '/history', label: 'My Recordings' },
 ] as const;
 
 export function AppShell({ children }: { children: ReactNode }) {
@@ -25,7 +31,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         <div className="shell__header-inner">
           <Link href="/" className="brand">
             <span className="brand__mark" aria-hidden="true">
-              ◉
+              ✨
             </span>
             Voice Story Studio
           </Link>
@@ -47,7 +53,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       <main className="shell__main">{children}</main>
 
       <footer className="shell__footer">
-        Open-source voice cloning. Only clone a voice you own or have explicit permission to use.
+        Made for storytelling. Only use a voice that is yours, or one you have permission to use.
       </footer>
     </div>
   );
