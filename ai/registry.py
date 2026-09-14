@@ -62,6 +62,15 @@ def get_engine(name: str = "chatterbox", **kwargs) -> VoiceCloningEngine:
         return _engine
 
 
+def current_engine() -> VoiceCloningEngine | None:
+    """Return the engine if one already exists, without creating one.
+
+    ``/health`` must never be the call that constructs the engine: it is the
+    probe a deploy waits on, and construction imports torch.
+    """
+    return _engine
+
+
 def reset_engine() -> None:
     """Drop the singleton (tests, and hot-swapping engines in development)."""
     global _engine

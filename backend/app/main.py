@@ -14,7 +14,7 @@ from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 
-from ai.registry import get_engine
+from ai.registry import current_engine, get_engine
 from app import __version__
 from app.api.v1.router import api_router
 from app.core.config import get_settings
@@ -60,23 +60,32 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     with session_scope() as cleanup_session:
         cleanup_stale_documents(cleanup_session, settings)
 
-    engine = get_engine(settings.voice_engine, **settings.engine_kwargs())
+    # Deliberately NOT constructing the engine here unless asked to.
+    # ChatterboxEngine.__init__ calls resolve_device(), which imports torch --
+    # measured at ~45s on a fast machine, and lifespan blocks the server from
+    # accepting *any* connection until it returns. That silently defeated both
+    # ai/registry.py's promise that "process start-up stays fast" and
+    # render.yaml's PRELOAD_MODEL=false, whose stated reason is to keep boot
+    # under the deploy health check's timeout. Nothing needs the engine at
+    # boot: api/deps.py builds the same singleton on first request, and
+    # /health reports engine_loaded=False until then.
     logger.info(
-        "%s v%s starting | engine=%s variant=%s device=%s",
+        "%s v%s starting | engine=%s variant=%s device=%s (created on first use)",
         settings.app_name,
         __version__,
-        engine.name,
-        engine.info().variant,
-        engine.info().device,
+        settings.voice_engine,
+        settings.chatterbox_variant,
+        settings.device,
     )
     if settings.preload_model:
         logger.info("Preloading model weights ...")
         try:
+            engine = get_engine(settings.voice_engine, **settings.engine_kwargs())
             engine.load()
+            app.state.engine = engine
         except Exception:
             logger.exception("Model preload failed; will retry on first request")
 
-    app.state.engine = engine
     app.state.storage = storage
     yield
     logger.info("Shutting down")
@@ -157,7 +166,9 @@ def create_app() -> FastAPI:
 
     @app.get("/health", response_model=HealthResponse, tags=["system"], summary="Liveness probe")
     def health() -> HealthResponse:
-        engine = getattr(app.state, "engine", None)
+        # Via the registry, not app.state: with the engine created lazily on
+        # first request, app.state only holds one in the preload path.
+        engine = current_engine()
         return HealthResponse(
             status="ok",
             engine_loaded=bool(engine and engine.is_loaded),

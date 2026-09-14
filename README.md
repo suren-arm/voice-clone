@@ -858,7 +858,7 @@ See [Book Reader](#book-reader).
 ## Testing
 
 ```bash
-# Backend — 272 tests, mock engine + real espeak-ng, no torch weights, ~30 s
+# Backend — 274 tests, mock engine + real espeak-ng, no torch weights, ~30 s
 cd backend && pytest
 
 # By layer

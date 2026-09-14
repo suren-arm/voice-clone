@@ -47,3 +47,40 @@ def test_openapi_schema_is_generated(client):
     assert "/api/v1/voices" in spec["paths"]
     assert "/api/v1/speech" in spec["paths"]
     assert "/api/v1/books/upload" in spec["paths"]
+
+
+def test_startup_does_not_construct_the_engine(client):
+    """Booting must not import torch.
+
+    ``ChatterboxEngine.__init__`` calls ``resolve_device()``, which imports
+    torch -- ~45s on a cold page cache, which is exactly the state a freshly
+    deployed container is in. Lifespan blocks the server from accepting any
+    connection until it returns, so doing this at boot pushed the deploy
+    health check past its timeout and the service never answered. The engine
+    is created by the first request that actually needs it instead.
+    """
+    from ai.registry import current_engine
+
+    assert current_engine() is None
+
+    # /health is the probe a deploy waits on -- it must stay cheap.
+    assert client.get("/health").json()["engineLoaded"] is False
+    assert current_engine() is None
+
+
+def test_health_reports_a_loaded_engine_created_outside_startup(client):
+    """``engineLoaded`` must stay truthful now that boot no longer sets it.
+
+    /health used to read ``app.state.engine``, which only lifespan assigned.
+    With the engine created on first request, it reads the registry instead --
+    so an engine loaded by a request is still reported.
+    """
+    from ai.registry import current_engine
+
+    client.get("/api/v1/system/info")
+    engine = current_engine()
+    assert engine is not None
+    assert client.get("/health").json()["engineLoaded"] is engine.is_loaded
+
+    engine.load()
+    assert client.get("/health").json()["engineLoaded"] is True

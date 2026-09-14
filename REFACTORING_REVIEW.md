@@ -6,7 +6,7 @@ what changed as a result.
 The brief was explicit that not everything should be rewritten: *"Do not blindly
 refactor everything. Every change must solve a real problem."* This document is
 therefore as much about what was **left alone**, and why, as about what moved.
-Six things changed. Everything else was examined and deliberately kept.
+Seven things changed. Everything else was examined and deliberately kept.
 
 ---
 
@@ -77,7 +77,7 @@ without dragging FastAPI along, which is what its separation was for.
 
 | Boundary | What it buys | Evidence it earns its keep |
 |---|---|---|
-| `VoiceCloningEngine` ABC | CI runs the whole API suite with no torch and no weights | `requirements-ci.txt` installs no torch; 272 tests pass in ~30 s |
+| `VoiceCloningEngine` ABC | CI runs the whole API suite with no torch and no weights | `requirements-ci.txt` installs no torch; 274 tests pass in ~30 s |
 | `AiTextProvider` ABC | Four vendors behind one call, and `"auto"` degrades in priority order | Story generation works with zero, one, or four keys configured |
 | `DocumentExtractor` ABC | PDF and HTML converge on one `Document` before any TTS logic runs | `ReadingService` has no idea which extractor produced its sections |
 
@@ -184,8 +184,44 @@ before being accepted or rejected.
 | Duration read-back after `apply_speed` | `apply_speed` rewrites the file, so the pre-speed duration was wrong | Fixed earlier: duration now comes from `sf.info()` on the final file |
 | Conditioning cache for cloned voices | Already implemented (`hasConditioningCache`) | Correct as-is |
 
-The honest summary: **this codebase did not have a performance problem**, and
-the most valuable performance work in this review was declining to do any.
+### The one that mattered: 74s of dead time before the server answered anything
+
+Verifying the deployed app (§12) sent me looking at startup, and measurement
+found the real performance bug — not in a request path, but before any request
+could be served at all.
+
+`lifespan` called `get_engine(...)`. That does not load model weights
+(`PRELOAD_MODEL=false` on Render), but `ChatterboxEngine.__init__` calls
+`resolve_device()`, which does `import torch`. Uvicorn accepts no connection
+until lifespan returns, so the whole server was held hostage to that import.
+
+Measured, same machine, identical cold page cache — the state a freshly
+deployed container is always in:
+
+| | Cold boot → first healthy `/health` |
+|---|---|
+| Before | **74.1 s** |
+| After | **4.7 s** |
+
+(Warm-cache boot was always ~3 s, which is why this never showed up in local
+development or in CI. Only a cold container pays it — and a cold container is
+exactly what a deploy health check probes.)
+
+The fix is three lines and removes an inconsistency rather than adding a
+mechanism: `api/deps.py` already builds the same singleton on first request,
+and `/health` already reported `engineLoaded: false` until weights load. Two
+comments in this repo already promised this behaviour and were silently wrong —
+`ai/registry.py`'s "process start-up stays fast", and `render.yaml`'s note that
+loading at boot "would push Render's deploy health check past its timeout".
+Now both are true.
+
+`/health` also moved from reading `app.state.engine` to asking the registry, so
+it stays accurate when a request, not startup, created the engine. Two
+regression tests lock both halves in.
+
+The honest summary: **the codebase had no problem in any request path** — the
+one real performance defect was in the boot path, it was invisible to every
+warm-cache measurement, and only verifying production actually surfaced it.
 
 ---
 
@@ -427,7 +463,7 @@ Every check below was run, not assumed.
 |---|---|
 | `ruff check .` | PASS — all checks passed |
 | `ruff format --check .` | PASS — 111 files already formatted |
-| Backend `pytest` | PASS — 272 passed, 7 deselected |
+| Backend `pytest` | PASS — 274 passed, 7 deselected |
 | Frontend `tsc --noEmit` | PASS |
 | Frontend `eslint src e2e` | PASS |
 | Frontend `vitest run` | PASS — 71 passed |
@@ -442,8 +478,19 @@ healthy network path followed by silence means Render's router is waiting on an
 origin that never answers. None of the changes in this review are deployed —
 they sit on a branch, and the deploy workflow runs on `master` only — so this is
 the pre-existing state of production, not a regression introduced here.
-Root-causing it needs the Render dashboard's own logs, which neither this
-sandbox nor CI can reach.
+**Then measuring the boot path found a cause.** Uvicorn accepts no connection
+until `lifespan` returns, and `lifespan` was importing torch — 74 s on a cold
+page cache, which is the only kind a freshly deployed container has. "TLS
+completes, then silence" is precisely what a router shows while waiting on a
+server that has not finished starting, and `Dockerfile.render`'s container
+health check allowed a 90 s start period, so a boot that overran it would be
+killed and restarted — never finishing. That is a coherent explanation for a
+permanently silent origin, and §5 documents the fix that takes boot to 4.7 s.
+
+It is an explanation, not a confirmed diagnosis: proving it is what happened to
+this particular instance needs Render's own deploy and runtime logs, which
+neither this sandbox nor CI can reach. The fix is worth shipping either way —
+the 74 s boot was real, measured, and wrong on its own terms.
 
 Six e2e assertions were updated, all of them for deliberate renames from the
 redesign ("Book Reader" → "Read a Book", "Create Voice" → "Make My Own Voice",
@@ -478,19 +525,24 @@ in — frontend UX and dependency hygiene — were the two that got real work.
 
 Ordered by what would bite first.
 
-1. **No generation timeout.** A wedged synthesis call is bounded only by
+1. **Cold-start cost is still ~5 s, and unmeasured in CI.** Boot no longer
+   imports torch, but nothing stops the next module-level import from
+   regressing it. The two new tests in `tests/api/test_system_api.py` assert
+   the engine is not constructed at boot, which is the half that mattered; a
+   guard on total import time would be the next step if this recurs.
+2. **No generation timeout.** A wedged synthesis call is bounded only by
    Render's proxy. The place to add one is `speech_service._generate`, around
-   the engine call, surfaced as a `503` with a retry hint. Deliberately not done
-   here: it changes runtime behaviour, which is outside a review's remit.
-2. **Rate limiting is per-instance.** Scaling Render beyond one instance
+   the engine call, surfaced as a `503` with a retry hint. Deliberately not
+   done here: it changes runtime behaviour, which is outside a review's remit.
+3. **Rate limiting is per-instance.** Scaling Render beyond one instance
    multiplies every limit by the instance count. Needs Redis before that
    happens; the config already says so.
-3. **SQLite on one persistent disk.** Ties the backend to a single instance for
+4. **SQLite on one persistent disk.** Ties the backend to a single instance for
    the same reason. Documented in the README's Known limitations.
-4. **DNS rebinding.** `fetch_url_safely` validates every resolved address but
+5. **DNS rebinding.** `fetch_url_safely` validates every resolved address but
    cannot close the window between resolution and connection. Documented in the
    security section rather than silently accepted; closing it needs a pinned
    resolver.
-5. **The two narration forms** still share a state-and-try/catch shape. Worth
+6. **The two narration forms** still share a state-and-try/catch shape. Worth
    revisiting only if a third narration surface appears — two is not yet a
    pattern.
