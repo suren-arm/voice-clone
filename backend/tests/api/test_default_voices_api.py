@@ -82,9 +82,14 @@ def test_long_text_is_chunked_and_concatenated_for_a_default_voice(client):
 
 
 def test_background_sound_reports_unavailable_without_ffmpeg_gracefully(client, monkeypatch):
-    import ai.audio_mix as audio_mix
+    # Patched where it is *used*: speech_service imports the name directly
+    # (`from ai.audio_mix import ... ffmpeg_available ...`), so patching
+    # `ai.audio_mix.ffmpeg_available` would leave that already-bound copy
+    # untouched and this test would silently pass for the wrong reason
+    # whenever ffmpeg happens to be genuinely absent from the test host.
+    import app.services.speech_service as speech_service
 
-    monkeypatch.setattr(audio_mix, "ffmpeg_available", lambda: False)
+    monkeypatch.setattr(speech_service, "ffmpeg_available", lambda: False)
     defaults = client.get("/api/v1/voices/defaults").json()
     voice = next(v for v in defaults if v["language"] == "en")
     response = client.post(

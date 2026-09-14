@@ -9,6 +9,10 @@ const limits: Limits = {
   maxTextChars: 50,
   maxVoices: 10,
   requireConsent: true,
+  maxPdfBytes: 20971520,
+  maxPdfPages: 500,
+  maxRemoteDownloadBytes: 20971520,
+  maxBookNarrationChars: 12000,
 };
 
 describe('validateVoiceName', () => {

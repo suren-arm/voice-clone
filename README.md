@@ -2,12 +2,15 @@
 
 Open-source voice cloning and story narration as a web application. Clone
 your own voice from a 10–30 second recording, or skip that entirely and use a
-built-in default voice. Write text or generate an original fairy tale in
-English or Armenian, then narrate it — optionally with a background ambience
-mixed under the narration. Everything runs on your own backend; fairy-tale
-text generation is the only feature that calls a third-party API, and it
-supports **four interchangeable providers** so no single AI vendor is
-required — see [AI Providers](#ai-providers).
+built-in default voice. Write text, generate an original fairy tale, or
+**upload a PDF / paste a public web link and have the app read it to you**
+(see [Book Reader](#book-reader)) — in English or Armenian, then narrate it,
+optionally with a background ambience mixed under the narration. Everything
+runs on your own backend; fairy-tale text generation is the only feature that
+calls a third-party API, and it supports **four interchangeable providers**
+so no single AI vendor is required — see [AI Providers](#ai-providers). The
+Book Reader needs none of them: PDF/web extraction and narration are pure
+backend pipelines, no LLM involved.
 
 **Voice cloning model:** [Chatterbox Multilingual V3](https://github.com/resemble-ai/chatterbox)
 by Resemble AI — MIT-licensed **code *and* weights**, 23 languages, zero-shot
@@ -24,12 +27,18 @@ provider abstraction works and which is used when.
 
 ```
                                         ┌─▶ VoiceCloningEngine ─▶ PyTorch (CUDA/CPU/MPS)
-Browser ──HTTPS──▶ FastAPI ──┬─ speech ─┤
- record/type         REST    │          └─▶ espeak-ng (default voices, en + hy)
- playback                    │                    │
-                              └─ stories ─▶ StoryService ─▶ AiProviderRegistry
-                                                                  │
-                                              OpenAI · Gemini · Claude · Ollama
+                              ┌─ speech ┤
+                              │         └─▶ espeak-ng (default voices, en + hy)
+                              │                    │
+Browser ──HTTPS──▶ FastAPI ──┼─ stories ─▶ StoryService ─▶ AiProviderRegistry
+ record/type         REST    │                                  │
+ playback                    │              OpenAI · Gemini · Claude · Ollama
+                              │
+                              └─ books ──▶ DocumentService ─┬─▶ PdfDocumentExtractor (pypdf)
+                                              │              └─▶ WebDocumentExtractor (trafilatura,
+                                              │                   SSRF-safe fetch)
+                                              ▼
+                                        ReadingService ─▶ (same speech pipeline above)
                                                    │
                                      ffmpeg mixes narration + ambience
                                                    │
@@ -45,6 +54,12 @@ Browser ──HTTPS──▶ FastAPI ──┬─ speech ─┤
 - [Why this model](#why-this-model)
 - [AI Providers](#ai-providers)
 - [Armenian](#armenian)
+- [Book Reader](#book-reader)
+  - [PDF upload](#pdf-upload)
+  - [HTTP/HTTPS link reading](#httphttps-link-reading)
+  - [Security: SSRF protection](#security-ssrf-protection)
+  - [Reading range and long-book chunking](#reading-range-and-long-book-chunking)
+  - [Local testing](#local-testing-book-reader)
 - [Quick start](#quick-start)
 - [Local development](#local-development)
 - [Docker](#docker)
@@ -73,21 +88,24 @@ Browser ──HTTPS──▶ FastAPI ──┬─ speech ─┤
 
 - **Two voice sources.** *My Cloned Voice* (Chatterbox, requires a recording)
   or *Default Voice* (espeak-ng, no recording — English and Armenian).
-- **Two modes.** *Text to Speech* for text you write yourself, and
-  *Create Fairy Tale* — describe characters, an idea, age group, length and
-  tone, and Claude generates an original story you can edit before narrating.
-- **English and Armenian.** Manual text, fairy-tale generation, and default-voice
-  TTS all genuinely support both. Cloned-voice narration does not yet support
-  Armenian — the UI disables that specific combination and explains why,
-  rather than allowing a request that fails obscurely (see
-  [Armenian](#armenian)).
+- **Three modes.** *Text to Speech* for text you write yourself, *Create
+  Fairy Tale* — describe characters, an idea, age group, length and tone, and
+  an AI provider generates an original story you can edit before narrating —
+  and **Book Reader** — upload a PDF or paste a public web link, pick what to
+  read, and narrate it (see [Book Reader](#book-reader)).
+- **English and Armenian.** Manual text, fairy-tale generation, Book Reader
+  extraction, and default-voice TTS all genuinely support both. Cloned-voice
+  narration does not yet support Armenian — the UI disables that specific
+  combination and explains why, rather than allowing a request that fails
+  obscurely (see [Armenian](#armenian)).
 - **Background ambience.** Optional, mixed under the narration via ffmpeg —
-  currently *None* and *Mystical* (a self-generated, license-free synth pad;
-  see `scripts/generate_ambience.py`). The narration always stays louder and
-  clearer than the background, whatever the volume slider is set to.
-- **Long-text-safe narration.** Fairy tales are chunked at paragraph/sentence
-  boundaries — never mid-word — synthesized per chunk, and concatenated, so a
-  long story doesn't risk a single giant, fragile TTS call.
+  *None*, *Mystical*, *Calm*, *Forest* and *Bedtime* (all self-generated,
+  license-free synth pads; see `scripts/generate_ambience.py`). The narration
+  always stays louder and clearer than the background, whatever the volume
+  slider is set to.
+- **Long-text-safe narration.** Fairy tales and books are chunked at
+  paragraph/sentence boundaries — never mid-word — synthesized per chunk, and
+  concatenated, so a long text doesn't risk a single giant, fragile TTS call.
 - Everything from the original voice-cloning app is unchanged: recording,
   upload, consent, voice management, playback, download, watermarking.
 
@@ -100,7 +118,10 @@ Browser ──HTTPS──▶ FastAPI ──┬─ speech ─┤
 | Default-voice TTS | ✅ (espeak-ng) | ✅ (espeak-ng, native phonetics) |
 | Voice cloning (create a voice) | ✅ | ⚠️ experimental only ([docs/ARMENIAN.md](docs/ARMENIAN.md)) |
 | Cloned-voice TTS | ✅ | ❌ disabled in the UI — see [Armenian](#armenian) |
-| Background ambience (Mystical) | ✅ | ✅ |
+| Background ambience | ✅ (5 tracks) | ✅ (5 tracks) |
+| Book Reader — PDF extraction | ✅ | ✅ (verified: real Armenian Unicode, no mojibake) |
+| Book Reader — web article extraction | ✅ | ✅ |
+| Book Reader — narration | ✅ (cloned or default) | ✅ (default only, same rule as above) |
 
 "✅" means genuinely supported and tested, not merely accepted by the API.
 Nothing in this table is marked supported based on what a model claims to do —
@@ -253,6 +274,184 @@ fine-tuning path to real cloning support): **[docs/ARMENIAN.md](docs/ARMENIAN.md
 
 Disable the experimental cloned-voice bridge (API-only; the UI never exposed
 it) with `ENABLE_EXPERIMENTAL_ARMENIAN=false`.
+
+---
+
+## Book Reader
+
+Upload a PDF, or paste a public web link (an article or a PDF URL), and have
+the app extract the readable text and narrate it — in your cloned voice or a
+default voice, with the same optional background ambience as everything
+else. This is a **separate workflow** from Text to Speech's text box: the
+`/book-reader` screen never asks you to paste text yourself.
+
+```
+PDF Upload / URL
+       │
+       ▼
+DocumentService ──┬─▶ PdfDocumentExtractor (pypdf)
+                   └─▶ WebDocumentExtractor (SSRF-safe fetch + trafilatura)
+       │
+       ▼
+Document + DocumentSection (persisted; original PDF bytes are never kept)
+       │
+       ▼
+Extracted-text preview (paginated, one page/section at a time)
+       │  user picks: Entire / Pages / Section, language, voice, speed, background
+       ▼
+ReadingService (resolves the range, enforces MAX_BOOK_NARRATION_CHARS)
+       │
+       ▼
+SpeechService.generate_for_book  ──▶  (the same TTS/mixing pipeline every
+                                        other feature uses)
+       │
+       ▼
+Generation (playable + downloadable exactly like any other narration)
+```
+
+**No AI/LLM involved by default.** PDF and web extraction are pure parsing
+and boilerplate-removal pipelines (`pypdf`, `trafilatura`) — reading a book
+never calls OpenAI, Gemini, Claude or Ollama, and needs none of the four
+provider keys from [AI Providers](#ai-providers) configured. (Optional future
+features like "Summarize this chapter" would use that same provider
+architecture — see [Known limitations](#known-limitations) for what is and
+isn't built yet.)
+
+### Supported document types
+
+| Input | How it's identified | Notes |
+|---|---|---|
+| Uploaded PDF | Magic-byte check (`%PDF-`) — never the `.pdf` extension alone | Encrypted/password-protected and scanned (no text layer) PDFs are rejected with a clear message, not silently emptied |
+| Public PDF URL | Response `Content-Type` **and** magic bytes — whichever says PDF | A `.html` URL that actually serves a PDF (or vice versa) is still handled correctly |
+| Public web article URL | Whatever isn't identified as a PDF, run through `trafilatura` | Navigation, ads, cookie banners, footers and scripts are stripped — verified in tests against a realistic boilerplate-heavy page, not assumed |
+
+### PDF upload
+
+```
+PDF Upload → validate (type, size, page count, encryption) → extract text
+  → detect structure (page-by-page, best-effort heading per page)
+  → display extracted text (paginated preview) → user selects reading range
+  → generate narration
+```
+
+Validated before anything is parsed further: real file content (not the
+filename), total size (`MAX_PDF_BYTES`, default 20 MiB), page count
+(`MAX_PDF_PAGES`, default 500), and encryption state (an empty-password
+"encrypted" PDF — common for permission-only restrictions — is transparently
+unlocked; a genuinely password-protected one is rejected with a clear
+message). **Scanned PDFs** (little or no extractable text on most pages) are
+detected and reported — *"This PDF appears to contain scanned pages and does
+not have extractable text"* — never silently returned as empty. OCR is not
+implemented in this version (see [Known limitations](#known-limitations)).
+
+### HTTP/HTTPS link reading
+
+Paste a link to an article or a PDF. The backend determines which it actually
+is from the real HTTP response — content-type header and magic bytes — never
+from the URL's own spelling, and extracts accordingly (see the table above).
+This is a **read-only, single-page tool**: it processes only the exact
+page/document you give it. There is no crawler, no search, and no feature
+that looks for other copies of a book elsewhere — see
+[Copyright-aware behaviour](#security-ssrf-protection) below.
+
+### Security: SSRF protection
+
+Fetching a URL on the server's behalf is treated as a security-sensitive
+feature (`backend/app/services/documents/security.py`), not a thin wrapper
+around an HTTP client:
+
+- **Only `http://`/`https://`** — `ftp://`, `file://`, and anything else is
+  rejected outright, with the message *"Invalid URL. Only public HTTP and
+  HTTPS links are supported."*
+- **DNS-resolved target validation.** The hostname is resolved and every
+  returned address is checked against loopback, private (RFC 1918/4193),
+  link-local, multicast, reserved and unspecified ranges before any request
+  is made — this blocks `localhost`, `127.0.0.1`, `::1`, internal IPs, and
+  cloud metadata endpoints (`169.254.169.254` and friends fall under
+  link-local, already covered).
+- **Every redirect hop is re-validated**, not just the first URL — a public
+  page that redirects to an internal address is refused exactly like
+  requesting the internal address directly. Redirects are capped
+  (`BOOK_FETCH_MAX_REDIRECTS`, default 5).
+- **Bounded resources**: separate connect/read timeouts
+  (`BOOK_FETCH_CONNECT_TIMEOUT_SECONDS` / `BOOK_FETCH_READ_TIMEOUT_SECONDS`)
+  and a byte cap (`MAX_REMOTE_DOWNLOAD_BYTES`) enforced while *streaming* the
+  response — a server that omits or lies about `Content-Length` cannot bypass
+  it.
+- **Never a general-purpose proxy.** There is no way to retrieve raw bytes
+  from an arbitrary internal host through this feature; only the extracted,
+  normalized text of a public document ever comes back.
+
+**Documented limitation:** the DNS check resolves the hostname once, before
+connecting; a small residual window for adversarial DNS-rebinding remains
+(the target's own DNS server could answer differently a moment later), which
+would need a transport that pins the exact validated IP to close completely.
+This covers the overwhelming majority of real SSRF attempts (literal internal
+addresses, `localhost`, known metadata hostnames); a deployment with a
+stricter threat model should add network-level egress control (a firewall or
+forward proxy) alongside it. See the module's own docstring for the full
+reasoning.
+
+### Reading range and long-book chunking
+
+A book may be hundreds of pages; "Start Reading" never sends the whole thing
+to the TTS engine in one call. Pick **Entire Document**, a **Page range**
+(PDF only — an HTML article has no pages), or a **Selected Section** (a
+heading-delimited block of a web article, or a single PDF page). Whatever is
+selected is capped at `MAX_BOOK_NARRATION_CHARS` (default 12,000 characters —
+larger than a single manual/fairy-tale request's cap, but still a bounded
+batch, not an unbounded book): choosing a smaller range is how a full book
+gets read in this version, rather than a background job queue this project
+does not have yet (see [Known limitations](#known-limitations)). Within
+whatever range is selected, the existing paragraph/sentence-safe chunker
+(`ai/text_chunking.py`) still applies before synthesis, exactly as it does
+for fairy tales.
+
+**Resume reading.** The last document, reading range, voice and language are
+remembered in the browser (`localStorage`) so returning to `/book-reader`
+offers a "Resume" option — session-level, by design (see
+[Known limitations](#known-limitations) for why this isn't a database
+table).
+
+**Cleanup.** The original PDF (uploaded or downloaded) is **never written to
+disk** — it is parsed entirely in memory and discarded. Only the extracted
+text and section metadata persist, in the same SQLite database as everything
+else, for `DOCUMENT_RETENTION_HOURS` (default 24) before a startup sweep
+removes it — a book is not meant to become a permanent library entry.
+Generated narration audio follows the same lifecycle as any other
+`Generation` (kept until you delete it, exactly like Text to Speech output).
+
+### Local testing (Book Reader)
+
+```bash
+# A small English PDF and a small Armenian PDF -- either from your own
+# files, or generate quick test fixtures the way the test suite does:
+cd backend && python3 -c "
+from tests.conftest import make_pdf_bytes
+open('/tmp/en.pdf', 'wb').write(make_pdf_bytes(['Chapter One\n\nHello world.']))
+open('/tmp/hy.pdf', 'wb').write(make_pdf_bytes(['Գլուխ մեկ\n\nԲարև աշխարհ։']))
+"
+curl -F "file=@/tmp/en.pdf" http://localhost:8000/api/v1/books/upload
+curl -F "file=@/tmp/hy.pdf" http://localhost:8000/api/v1/books/upload
+
+# A public HTML article and a public PDF URL
+curl -X POST http://localhost:8000/api/v1/books/from-url \
+  -H 'Content-Type: application/json' -d '{"url":"https://example.com/some-article"}'
+```
+
+Cases worth trying by hand, all of which return a clear error (never a crash
+or a silent empty result):
+
+| Case | Expected |
+|---|---|
+| A non-HTTP URL (`ftp://…`, `file://…`) | `422 unsupported_url` — "Only public HTTP and HTTPS links are supported." |
+| An internal address (`http://127.0.0.1/`, `http://localhost/`) | `422 unsupported_url` — blocked as a private/local target |
+| A URL that 404s or times out | `502 remote_fetch_failed` with the real reason |
+| A redirect loop | `502 remote_fetch_failed` — "Too many redirects" |
+| A file far larger than `MAX_PDF_BYTES`/`MAX_REMOTE_DOWNLOAD_BYTES` | `413 payload_too_large` (upload) or `502` (remote) |
+| An empty or corrupted PDF | `422 document_invalid` |
+| A password-protected PDF | `422 document_invalid` — "password-protected" |
+| A scanned (image-only) PDF | `422 document_scanned` — "appears to contain scanned pages" |
 
 ---
 
@@ -463,6 +662,24 @@ background ambience) works with all four unset. Full explanation:
 | `AI_AUTO_PREFER_FREE` | `false` | "auto" mode tries free-tier/local providers before paid ones |
 | `RATE_LIMIT_STORY_PER_HOUR` | `30` | |
 
+### Optional (Book Reader)
+
+No AI provider needed — see [Book Reader](#book-reader). All have working
+defaults; tune them to your deployment's memory/disk budget.
+
+| Variable | Default | Notes |
+|---|---|---|
+| `MAX_PDF_BYTES` | 20 MiB | Uploaded PDF size cap |
+| `MAX_PDF_PAGES` | `500` | Applies to an uploaded PDF and one fetched from a URL alike |
+| `MAX_REMOTE_DOWNLOAD_BYTES` | 20 MiB | Cap for a URL-fetched PDF or HTML page |
+| `BOOK_FETCH_CONNECT_TIMEOUT_SECONDS` | `5` | |
+| `BOOK_FETCH_READ_TIMEOUT_SECONDS` | `20` | |
+| `BOOK_FETCH_MAX_REDIRECTS` | `5` | |
+| `MAX_BOOK_NARRATION_CHARS` | `12000` | One "Start Reading" call's text budget — see [Reading range and long-book chunking](#reading-range-and-long-book-chunking) |
+| `DOCUMENT_RETENTION_HOURS` | `24` | Extracted text/metadata older than this is swept on startup |
+| `RATE_LIMIT_BOOK_INGEST_PER_HOUR` | `20` | Upload + URL-fetch requests |
+| `RATE_LIMIT_BOOK_NARRATE_PER_HOUR` | `30` | |
+
 ### Deployment-only
 
 Set these on the **host** (Render's Environment tab, or your own server) —
@@ -498,15 +715,18 @@ voice-clone/
 │
 ├── backend/
 │   ├── app/
-│   │   ├── main.py              app factory, middleware, health, default-voice bootstrap
-│   │   ├── api/v1/              voices · speech · generations · stories · system
-│   │   ├── assets/ambience/     self-generated background tracks (mystical.wav)
+│   │   ├── main.py              app factory, middleware, health, default-voice/doc-cleanup bootstrap
+│   │   ├── api/v1/              voices · speech · generations · stories · books · system
+│   │   ├── assets/ambience/     self-generated background tracks (mystical/calm/forest/bedtime)
 │   │   ├── core/                config · errors · security · rate limiting
 │   │   ├── db/                  engine, session, base
-│   │   ├── models/              SQLAlchemy: Voice, Generation, AuditEvent
+│   │   ├── models/              SQLAlchemy: Voice, Generation, AuditEvent, Document, DocumentSection
 │   │   ├── schemas/             Pydantic request/response (camelCase)
 │   │   ├── repositories/        data access
-│   │   └── services/            voice · speech · story · language · default_voices · storage
+│   │   └── services/
+│   │       ├── documents/       Book Reader: PdfDocumentExtractor · WebDocumentExtractor ·
+│   │       │                    security (SSRF-safe fetch) · ReadingService · DocumentService
+│   │       └── voice · speech · story · language · default_voices · storage
 │   ├── tests/{unit,api,integration,ai}/
 │   ├── requirements.txt         full stack
 │   ├── requirements-ci.txt      no torch — what CI installs
@@ -514,19 +734,19 @@ voice-clone/
 │
 ├── frontend/
 │   ├── src/
-│   │   ├── app/                 App Router pages, incl. fairy-tale/
+│   │   ├── app/                 App Router pages, incl. fairy-tale/ · book-reader/
 │   │   ├── components/          shared UI
-│   │   ├── features/            voices/ · speech/ · story/
+│   │   ├── features/            voices/ · speech/ · story/ · book-reader/
 │   │   ├── hooks/               useRecorder · useVoices · useDefaultVoices · useSystemInfo · …
-│   │   ├── services/            the only code that knows the API exists
+│   │   ├── services/            the only code that knows the API exists (incl. books.ts)
 │   │   ├── types/               API contract types
-│   │   └── utils/               format · audio · validation · voiceCapability
+│   │   └── utils/               format · audio · validation · voiceCapability · bookReaderSession
 │   ├── e2e/                     Playwright
 │   └── Dockerfile
 │
 ├── docs/                        research, architecture, API, security, …
 ├── scripts/                     download_model.py · benchmark.py · generate_ambience.py
-├── storage/                     voices/ · generated/ (gitignored)
+├── storage/                     voices/ · generated/ (gitignored — the Book Reader keeps no PDF here)
 └── docker-compose{,.gpu}.yml
 ```
 
@@ -558,7 +778,16 @@ POST   /api/v1/stories/generate             generate a fairy tale (English or Ar
                                              provider: "auto" or an exact provider id)
 GET    /api/v1/ai/providers                 which AI providers are configured (never a key)
 
-GET    /api/v1/system/info                  engine, languages, limits
+POST   /api/v1/books/upload                 upload a PDF (multipart), extract its text
+POST   /api/v1/books/from-url               fetch a public http(s) link (PDF or article), extract it
+GET    /api/v1/books/{id}                   document metadata (title, language, page/section count)
+GET    /api/v1/books/{id}/sections          paginated section list (titles/lengths, never full text)
+GET    /api/v1/books/{id}/sections/{index}  one section's full text (the preview screen)
+POST   /api/v1/books/{id}/narrate           narrate a range (entire/pages/section) — returns a
+                                             Generation, same playback/download as everything else
+DELETE /api/v1/books/{id}                   delete the extracted document (narrations are unaffected)
+
+GET    /api/v1/system/info                  engine, languages, limits (incl. Book Reader limits)
 GET    /health                              liveness
 ```
 
@@ -575,12 +804,21 @@ only); fetch them from `GET /voices/defaults`.
 wordCount}`. Narrating the result — or any manually-typed text — is the same
 `POST /speech` call, no separate "narrate" endpoint.
 
+`POST /books/{id}/narrate` is the one exception that does *not* reuse
+`POST /speech` directly: `SpeechRequest.text` has its own hard ceiling sized
+for hand-typed/generated text, so book narration calls a book-specific
+service entry point (`SpeechService.generate_for_book`) with a larger,
+separately-configured budget (`MAX_BOOK_NARRATION_CHARS`) — but it is the
+exact same underlying chunking, synthesis, background-mixing and
+`Generation`-persistence code path, just reached with a different ceiling.
+See [Book Reader](#book-reader).
+
 ---
 
 ## Testing
 
 ```bash
-# Backend — 191 tests, mock engine + real espeak-ng, no torch weights, ~18 s
+# Backend — 272 tests, mock engine + real espeak-ng, no torch weights, ~30 s
 cd backend && pytest
 
 # By layer
@@ -589,21 +827,21 @@ pytest tests/unit tests/api tests/integration
 # Real cloning model — opt-in, downloads weights
 pytest -m ai tests/ai
 
-# Frontend — 62 unit tests
+# Frontend — 70 unit tests
 cd frontend && npm run test:run
 
-# End-to-end — 10 tests, desktop + mobile viewports
+# End-to-end — 16 tests, desktop + mobile viewports
 npm run test:e2e
 ```
 
 | Suite | What it covers |
 |---|---|
-| `tests/unit` | Path traversal, filename sanitisation, audio validation, container sniffing, silence trimming, rate limiting, Armenian transliteration, the engine contract |
-| `tests/api` | Every endpoint: consent gating, bad formats, oversized uploads, quotas, empty/overlong text, unknown IDs, byte ranges, pagination |
+| `tests/unit` | Path traversal, filename sanitisation, audio validation, container sniffing, silence trimming, rate limiting, Armenian transliteration, the engine contract, PDF extraction (English/Armenian/mixed/encrypted/scanned), SSRF blocking, HTML boilerplate removal, reading-range resolution |
+| `tests/api` | Every endpoint: consent gating, bad formats, oversized uploads, quotas, empty/overlong text, unknown IDs, byte ranges, pagination, Book Reader upload/from-url/sections/narrate (remote HTTP mocked — no test depends on a real website) |
 | `tests/integration` | The full journey; conditioning-cache reuse; cascade delete; audit trail; rate limits end to end |
 | `tests/ai` | Real Chatterbox: language set, conditioning round trip, synthesis, **watermark detectability**, RTF |
-| `frontend` (Vitest) | Formatting, file validation, the API client's error handling, the audio player, the dropzone, the generate form |
-| `e2e` (Playwright) | Create → generate → play → download → delete, real `MediaRecorder` capture, the Armenian labelling path, API-failure handling, phone-width layout |
+| `frontend` (Vitest) | Formatting, file validation, the API client's error handling, the audio player, the dropzone, the generate form, the Book Reader form (upload, URL load, reading-range selection, narration, Armenian blocking, resume) |
+| `e2e` (Playwright) | Create → generate → play → download → delete, real `MediaRecorder` capture, the Armenian labelling path, API-failure handling, phone-width layout, Book Reader upload/URL/preset flow |
 
 CI never loads a model: `requirements-ci.txt` omits torch entirely and
 everything runs against `MockEngine`. The real-model suite is a separate,
@@ -665,6 +903,12 @@ scraped audio, or anything designed to remove a watermark.
 | **Rate limiting is per-process** | Wrong with more than one replica |
 | **English-first UI** | The app speaks 23 languages; its own interface does not |
 | **Quality is not guaranteed** | Zero-shot cloning depends heavily on the reference recording |
+| **No OCR** | A scanned (image-only) PDF is detected and clearly reported, not silently emptied — but its text is never extracted. Deliberately not built for this version; see [Book Reader](#book-reader) |
+| **No AI book features yet** | Summarize/translate/simplify/explain a section are not implemented — reading a book never requires an AI provider today. The existing multi-provider architecture is the natural place to add them later, opt-in per action |
+| **No whole-book single download** | Narration is generated per selected range (a bounded batch), each as its own downloadable `Generation` — there is no "compile the entire book into one audio file" feature yet |
+| **No background job queue for narration** | A book-sized narration is still one synchronous HTTP request, capped at `MAX_BOOK_NARRATION_CHARS` per call — the same constraint (and the same reasoning) as every other synchronous generation in this app |
+| **SSRF check has a residual DNS-rebinding window** | The hostname is resolved and validated before connecting, not pinned for the connection itself — see [Security: SSRF protection](#security-ssrf-protection) for the full reasoning and mitigation |
+| **Resume reading is session/browser-local** | `localStorage`, not a database row — clearing site data forgets it, and it does not follow you to another device |
 
 ---
 
@@ -901,7 +1145,11 @@ URLs (not localhost):
 - [ ] Voice cloning: record/upload → create a voice → narrate with it
 - [ ] `GET /api/v1/ai/providers` shows **at least one** provider `available: true`
 - [ ] **Create Fairy Tale** actually generates a story (not a 503)
-- [ ] Background ambience ("Mystical") audibly mixes under narration
+- [ ] **Book Reader**: upload a small PDF and confirm the extracted-text preview shows real text
+- [ ] **Book Reader**: paste a public article URL and confirm it extracts (not a raw-HTML dump)
+- [ ] **Book Reader**: narrate a page range and a selected section, both successfully
+- [ ] **Book Reader**: an internal/private URL (e.g. `http://127.0.0.1/`) is rejected with a 422, not fetched
+- [ ] Background ambience (any of the five) audibly mixes under narration
 - [ ] Generated audio plays back in the browser
 - [ ] Generated audio downloads correctly
 

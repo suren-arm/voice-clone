@@ -20,6 +20,12 @@ const MODE_TILES = [
     title: 'Create Fairy Tale',
     description: 'Generate an original story in English or Հայերեն, then narrate it.',
   },
+  {
+    href: '/book-reader',
+    icon: '📖',
+    title: 'Book Reader',
+    description: 'Upload a PDF or paste a public web link, then listen to it.',
+  },
 ] as const;
 
 const TILES = [

@@ -1,3 +1,5 @@
+import type { BackgroundSound } from '@/types';
+
 /**
  * Capability gating for the voice-source / language combination.
  *
@@ -17,9 +19,12 @@ export function isClonedVoiceBlockedForLanguage(language: string): boolean {
   return language.toLowerCase() === ARMENIAN_LANGUAGE_CODE;
 }
 
-export const BACKGROUND_SOUND_OPTIONS: { value: 'none' | 'mystical'; label: string }[] = [
+export const BACKGROUND_SOUND_OPTIONS: { value: BackgroundSound; label: string }[] = [
   { value: 'none', label: 'None' },
   { value: 'mystical', label: 'Mystical' },
+  { value: 'calm', label: 'Calm' },
+  { value: 'forest', label: 'Forest' },
+  { value: 'bedtime', label: 'Bedtime' },
 ];
 
 export const DEFAULT_BACKGROUND_VOLUME = 15;

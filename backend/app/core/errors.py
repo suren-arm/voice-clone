@@ -108,6 +108,33 @@ class StoryGenerationFailedError(AppError):
     code = "story_generation_failed"
 
 
+class DocumentNotFoundError(NotFoundError):
+    code = "document_not_found"
+
+
+class DocumentValidationError(ValidationError):
+    """A PDF or URL failed validation: bad type, too large, encrypted, etc."""
+
+    code = "document_invalid"
+
+
+class ScannedDocumentError(DocumentValidationError):
+    """The PDF parsed fine but has (almost) no extractable text -- likely scans."""
+
+    code = "document_scanned"
+
+
+class UnsupportedUrlError(ValidationError):
+    """Malformed URL, unsupported scheme, or blocked as a private/internal target."""
+
+    code = "unsupported_url"
+
+
+class RemoteFetchError(AppError):
+    status_code = status.HTTP_502_BAD_GATEWAY
+    code = "remote_fetch_failed"
+
+
 def error_body(code: str, message: str, details: dict[str, Any] | None = None) -> dict[str, Any]:
     body: dict[str, Any] = {"error": {"code": code, "message": message}}
     if details:

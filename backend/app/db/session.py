@@ -66,7 +66,7 @@ def init_db(settings: Settings | None = None) -> None:
     ``create_all`` is right for a single-file SQLite MVP. Introducing Alembic is
     the first thing Phase 2 does, at the same time as PostgreSQL.
     """
-    from app.models import audit, generation, voice  # noqa: F401  (register metadata)
+    from app.models import audit, document, generation, voice  # noqa: F401  (register metadata)
 
     Base.metadata.create_all(bind=get_engine(settings))
 

@@ -24,6 +24,7 @@ from app.core.rate_limit import RateLimiter, client_key
 from app.db.session import init_db, session_scope
 from app.schemas.common import HealthResponse
 from app.services.default_voices import ensure_default_voices
+from app.services.documents import cleanup_stale_documents
 from app.services.storage import LocalStorage
 
 logger = logging.getLogger(__name__)
@@ -55,6 +56,9 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
     with session_scope() as bootstrap_session:
         ensure_default_voices(bootstrap_session, storage)
+
+    with session_scope() as cleanup_session:
+        cleanup_stale_documents(cleanup_session, settings)
 
     engine = get_engine(settings.voice_engine, **settings.engine_kwargs())
     logger.info(

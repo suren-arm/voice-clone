@@ -10,7 +10,7 @@ test('the whole journey: create a voice, generate speech, download it, delete th
 }) => {
   // --- Home ---------------------------------------------------------------
   await page.goto('/');
-  await expect(page.getByRole('heading', { name: 'AI Voice Studio', level: 1 })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Voice Story Studio', level: 1 })).toBeVisible();
   await expect(page.getByTestId('system-status')).toContainText('mock');
 
   // --- Create voice: upload path ------------------------------------------
@@ -36,7 +36,7 @@ test('the whole journey: create a voice, generate speech, download it, delete th
 
   // --- Generate -----------------------------------------------------------
   await expect(page).toHaveURL(/\/generate\?voiceId=voice_e2e/);
-  await expect(page.getByTestId('voice-select')).toBeVisible();
+  await expect(page.getByTestId('cloned-voice-select')).toBeVisible();
 
   await expect(page.getByTestId('generate-submit')).toBeDisabled();
   await page.getByTestId('text-input').fill('Hello. This is my cloned voice.');
@@ -87,7 +87,11 @@ test('microphone recording produces a usable clip', async ({ page }) => {
   await expect(page.getByTestId('record-again')).toBeVisible();
 });
 
-test('the experimental Armenian path is labelled at every step', async ({ page }) => {
+test('cloned-voice narration for Armenian is blocked with a clear explanation', async ({ page }) => {
+  // Cloned-voice Armenian is not offered as an "experimental" path through
+  // this UI at all -- it is disabled outright, with an explanation, and the
+  // user is pointed at the Armenian default voice instead. See
+  // utils/voiceCapability.ts and docs/ARMENIAN.md.
   await page.goto('/voices/new');
   await page.getByTestId('mode-upload').click();
   await page.getByTestId('file-input').setInputFiles({
@@ -101,15 +105,14 @@ test('the experimental Armenian path is labelled at every step', async ({ page }
 
   await expect(page.getByTestId('language-select')).toBeVisible();
   await page.getByTestId('language-select').selectOption('hy');
-  await expect(page.getByText('Experimental language')).toBeVisible();
 
+  await expect(page.getByText('does not support Armenian')).toBeVisible();
   await page.getByTestId('text-input').fill('Բարև Ձեզ։');
-  await page.getByTestId('generate-submit').click();
+  await expect(page.getByTestId('generate-submit')).toBeDisabled();
 
-  const result = page.getByTestId('generation-result');
-  await expect(result).toBeVisible();
-  await expect(result.getByText('Experimental output')).toBeVisible();
-  await expect(result.getByText('Experimental', { exact: true })).toBeVisible();
+  // The toggle to the (working) default-voice path stays reachable --
+  // this must never be a dead end.
+  await expect(page.getByTestId('voice-source-default')).toBeVisible();
 });
 
 test('a failing API surfaces an error instead of a blank screen', async ({ page }) => {
@@ -130,7 +133,7 @@ test('the layout works at phone width', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto('/');
 
-  await expect(page.getByRole('heading', { name: 'AI Voice Studio', level: 1 })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Voice Story Studio', level: 1 })).toBeVisible();
   await expect(page.getByRole('link', { name: 'Create Voice' }).first()).toBeVisible();
 
   // No horizontal overflow: the body must not be wider than the viewport.

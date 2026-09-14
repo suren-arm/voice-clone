@@ -35,3 +35,14 @@ google-genai==2.23.0
 # comes in transitively via google-genai but is pinned explicitly since
 # ai_providers/ollama_provider.py imports it directly.
 httpx==0.28.1
+
+# ---- Book Reader (PDF upload / HTTP(S) link narration) ---------------------
+# No custom parsers: pypdf (BSD-3, maintained successor to PyPDF2) handles
+# PDF text extraction/encryption/validation; trafilatura (Apache-2.0) handles
+# main-content extraction from arbitrary web pages (strips nav/ads/footers
+# without hand-rolled regex). Both are lightweight, pure-Python-plus-lxml --
+# no torch, no heavy binary deps -- so, like the AI-provider SDKs above, they
+# belong in requirements-ci.txt too: app/services/documents/ is imported
+# unconditionally at API startup, the same way ai_providers/ is.
+pypdf==6.18.1
+trafilatura==2.2.0

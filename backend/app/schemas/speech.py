@@ -18,7 +18,7 @@ ABSOLUTE_MAX_TEXT_CHARS = 5000
 #: here (rather than importing that dict) so the schema has no import-time
 #: dependency on ffmpeg/asset presence -- validation is just which names are
 #: accepted, not whether the asset file happens to exist on this deployment.
-BackgroundSound = Literal["none", "mystical"]
+BackgroundSound = Literal["none", "mystical", "calm", "forest", "bedtime"]
 
 
 class SpeechRequest(ApiModel):

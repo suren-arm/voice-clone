@@ -25,7 +25,7 @@ export interface Voice {
 }
 
 /** "none" plus every background track the backend actually has an asset for. */
-export type BackgroundSound = 'none' | 'mystical';
+export type BackgroundSound = 'none' | 'mystical' | 'calm' | 'forest' | 'bedtime';
 
 export type VoiceSource = 'cloned' | 'default';
 
@@ -89,6 +89,10 @@ export interface Limits {
   maxTextChars: number;
   maxVoices: number;
   requireConsent: boolean;
+  maxPdfBytes: number;
+  maxPdfPages: number;
+  maxRemoteDownloadBytes: number;
+  maxBookNarrationChars: number;
 }
 
 export interface SystemInfo {
@@ -169,4 +173,64 @@ export interface ApiErrorBody {
     message: string;
     details?: Record<string, unknown>;
   };
+}
+
+// -- Book Reader --------------------------------------------------------------
+
+export type BookSourceType = 'pdf_upload' | 'pdf_url' | 'html_url';
+
+export interface BookDocument {
+  id: string;
+  title: string | null;
+  sourceType: BookSourceType;
+  sourceUrl: string | null;
+  originalFilename: string | null;
+  language: string;
+  pageCount: number | null;
+  sectionCount: number;
+  charCount: number;
+  createdAt: string;
+}
+
+export interface BookSectionSummary {
+  index: number;
+  title: string | null;
+  pageNumber: number | null;
+  charCount: number;
+}
+
+export interface BookSection extends BookSectionSummary {
+  text: string;
+}
+
+export type ReadingRangeKind = 'entire' | 'pages' | 'section';
+
+export interface ReadingRange {
+  kind: ReadingRangeKind;
+  fromPage?: number;
+  toPage?: number;
+  sectionIndex?: number;
+}
+
+/** Only the speeds ai.audio_mix's atempo filter is verified reliable at. */
+export type ReadingSpeed = 0.75 | 1 | 1.25 | 1.5;
+
+export interface NarrateBookInput {
+  voiceId: string;
+  language: string;
+  range: ReadingRange;
+  speed?: ReadingSpeed;
+  backgroundSound?: BackgroundSound;
+  backgroundVolume?: number;
+}
+
+export interface BookNarrationResult {
+  generationId: string;
+  documentId: string;
+  range: ReadingRange;
+  audioUrl: string;
+  durationSeconds: number;
+  notice: string | null;
+  backgroundApplied: boolean;
+  backgroundNotice: string | null;
 }

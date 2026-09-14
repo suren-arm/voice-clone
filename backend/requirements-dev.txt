@@ -4,3 +4,9 @@ pytest==9.0.2
 pytest-cov==7.0.0
 httpx==0.28.1
 ruff==0.15.4
+
+# Test-fixture generation only (tests/unit/test_pdf_extractor.py and
+# friends build real PDFs -- including genuine Armenian Unicode text, via
+# DejaVu Sans, a font already present in CI's Ubuntu image -- rather than
+# hand-crafting PDF byte streams). Never imported by application code.
+fpdf2==2.8.2

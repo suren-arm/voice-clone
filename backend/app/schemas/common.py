@@ -93,6 +93,11 @@ class LimitsDescription(ApiModel):
     max_text_chars: int
     max_voices: int
     require_consent: bool
+    # -- Book Reader --------------------------------------------------------
+    max_pdf_bytes: int
+    max_pdf_pages: int
+    max_remote_download_bytes: int
+    max_book_narration_chars: int
 
 
 class SystemInfo(ApiModel):

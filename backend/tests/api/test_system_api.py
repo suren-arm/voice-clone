@@ -14,6 +14,9 @@ def test_system_info_describes_engine_languages_and_limits(client):
     assert body["limits"]["maxTextChars"] > 0
     assert body["limits"]["requireConsent"] is True
     assert "wav" in body["acceptedAudioFormats"]
+    assert body["limits"]["maxPdfBytes"] > 0
+    assert body["limits"]["maxPdfPages"] > 0
+    assert body["limits"]["maxBookNarrationChars"] > 0
 
     codes = {lang["code"] for lang in body["languages"]}
     assert {"en", "ru", "de"} <= codes
@@ -43,3 +46,4 @@ def test_openapi_schema_is_generated(client):
     spec = client.get("/openapi.json").json()
     assert "/api/v1/voices" in spec["paths"]
     assert "/api/v1/speech" in spec["paths"]
+    assert "/api/v1/books/upload" in spec["paths"]

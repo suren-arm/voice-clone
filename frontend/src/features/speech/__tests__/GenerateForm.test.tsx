@@ -41,6 +41,10 @@ const systemInfo: SystemInfo = {
     maxTextChars: 40,
     maxVoices: 100,
     requireConsent: true,
+    maxPdfBytes: 20971520,
+    maxPdfPages: 500,
+    maxRemoteDownloadBytes: 20971520,
+    maxBookNarrationChars: 12000,
   },
   acceptedAudioFormats: ['wav', 'mp3'],
 };

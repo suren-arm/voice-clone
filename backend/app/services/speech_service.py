@@ -17,9 +17,10 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import numpy as np
+import soundfile as sf
 from sqlalchemy.orm import Session
 
-from ai.audio_mix import AudioMixError, ffmpeg_available, mix_with_background
+from ai.audio_mix import AudioMixError, apply_speed, ffmpeg_available, mix_with_background
 from ai.audio_processing import write_wav
 from ai.engine import (
     EngineError,
@@ -88,11 +89,83 @@ class SpeechService:
         profile,
         actor: str | None = None,
     ) -> SpeechResult:
-        if len(request.text) > self.settings.max_text_chars:
+        return self._generate(
+            text=request.text,
+            language=request.language,
+            voice=voice,
+            profile=profile,
+            exaggeration=request.exaggeration,
+            cfg_weight=request.cfg_weight,
+            temperature=request.temperature,
+            seed=request.seed,
+            background_sound=request.background_sound,
+            background_volume=request.background_volume,
+            max_text_chars=self.settings.max_text_chars,
+            speed=1.0,
+            actor=actor,
+            audit_event="speech.generated",
+        )
+
+    def generate_for_book(
+        self,
+        *,
+        text: str,
+        language: str,
+        voice: Voice,
+        profile,
+        background_sound: str = "none",
+        background_volume: int = 15,
+        speed: float = 1.0,
+        actor: str | None = None,
+    ) -> SpeechResult:
+        """Book Reader narration: the same pipeline, a book-sized text budget.
+
+        Kept as its own entry point (rather than widening ``SpeechRequest``'s
+        hard ``ABSOLUTE_MAX_TEXT_CHARS`` ceiling) so raising the limit for a
+        selected page range never changes what a single manual/fairy-tale
+        request is allowed to submit -- see ``BookNarrateRequest`` and
+        ``app/services/documents/reading_service.py``, which already
+        enforces ``max_book_narration_chars`` before this is ever called.
+        """
+        return self._generate(
+            text=text,
+            language=language,
+            voice=voice,
+            profile=profile,
+            exaggeration=None,
+            cfg_weight=None,
+            temperature=None,
+            seed=None,
+            background_sound=background_sound,
+            background_volume=background_volume,
+            max_text_chars=self.settings.max_book_narration_chars,
+            speed=speed,
+            actor=actor,
+            audit_event="book.narrated",
+        )
+
+    def _generate(
+        self,
+        *,
+        text: str,
+        language: str,
+        voice: Voice,
+        profile,
+        exaggeration: float | None,
+        cfg_weight: float | None,
+        temperature: float | None,
+        seed: int | None,
+        background_sound: str,
+        background_volume: int,
+        max_text_chars: int,
+        speed: float,
+        actor: str | None,
+        audit_event: str,
+    ) -> SpeechResult:
+        if len(text) > max_text_chars:
             raise ValidationError(
-                f"Text is {len(request.text)} characters; the limit is "
-                f"{self.settings.max_text_chars}.",
-                details={"maxChars": self.settings.max_text_chars},
+                f"Text is {len(text)} characters; the limit is {max_text_chars}.",
+                details={"maxChars": max_text_chars},
             )
 
         if voice.engine == DEFAULT_VOICE_ENGINE:
@@ -101,14 +174,14 @@ class SpeechService:
                 None,
                 False,
                 None,
-                self._synthesize_default_voice(voice, request.text),
+                self._synthesize_default_voice(voice, text),
             )
         else:
             try:
                 resolved = resolve_language(
                     self.engine,
-                    request.language,
-                    request.text,
+                    language,
+                    text,
                     include_armenian=self.settings.enable_experimental_armenian,
                 )
             except ValueError as exc:
@@ -117,7 +190,15 @@ class SpeechService:
             effective_text = resolved.text if resolved.experimental else None
             experimental = resolved.experimental
             notice = resolved.notice
-            synth = self._synthesize_cloned_voice(resolved.text, resolved.engine_language, request, profile)
+            synth = self._synthesize_cloned_voice(
+                resolved.text,
+                resolved.engine_language,
+                profile,
+                exaggeration=exaggeration,
+                cfg_weight=cfg_weight,
+                temperature=temperature,
+                seed=seed,
+            )
 
         audio_out, sample_rate, generation_seconds, watermarked, engine_name = synth
 
@@ -125,15 +206,21 @@ class SpeechService:
         output_path = self.storage.generation_path(generation_id)
         write_wav(output_path, audio_out, sample_rate)
 
+        if speed != 1.0:
+            try:
+                apply_speed(output_path, speed, out_path=output_path)
+            except AudioMixError:
+                logger.exception("Speed adjustment failed for generation %s", generation_id)
+
         background_applied = False
         background_notice: str | None = None
-        if request.background_sound != "none":
+        if background_sound != "none":
             if ffmpeg_available():
                 try:
                     mix_with_background(
                         output_path,
-                        request.background_sound,
-                        volume_percent=request.background_volume,
+                        background_sound,
+                        volume_percent=background_volume,
                         out_path=output_path,
                     )
                     background_applied = True
@@ -150,13 +237,19 @@ class SpeechService:
                 )
 
         size_bytes = output_path.stat().st_size
-        duration_seconds = len(audio_out) / sample_rate if sample_rate else 0.0
+        # Read the duration back from the file rather than trusting
+        # len(audio_out): speed adjustment and background mixing both
+        # rewrite output_path in place and can change its effective length.
+        output_info = sf.info(output_path)
+        duration_seconds = (
+            output_info.frames / output_info.samplerate if output_info.samplerate else 0.0
+        )
         real_time_factor = generation_seconds / duration_seconds if duration_seconds > 0 else 0.0
 
         generation = Generation(
             id=generation_id,
             voice_id=voice.id,
-            text=request.text,
+            text=text,
             language=resolved_language,
             effective_text=effective_text,
             filename=output_path.name,
@@ -172,17 +265,17 @@ class SpeechService:
         self.generations.add(generation)
         self.voices.mark_used(voice)
         self.audit.record(
-            "speech.generated",
+            audit_event,
             subject_id=generation_id,
             actor=actor,
             detail={
                 "voiceId": voice.id,
                 "language": resolved_language,
-                "chars": len(request.text),
+                "chars": len(text),
                 "durationSeconds": generation.duration_seconds,
                 "rtf": generation.real_time_factor,
                 "experimental": experimental,
-                "backgroundSound": request.background_sound,
+                "backgroundSound": background_sound,
                 "backgroundApplied": background_applied,
             },
         )
@@ -195,7 +288,15 @@ class SpeechService:
 
     # -- synthesis backends --------------------------------------------------
     def _synthesize_cloned_voice(
-        self, text: str, engine_language: str, request: SpeechRequest, profile
+        self,
+        text: str,
+        engine_language: str,
+        profile,
+        *,
+        exaggeration: float | None,
+        cfg_weight: float | None,
+        temperature: float | None,
+        seed: int | None,
     ) -> tuple[np.ndarray, int, float, bool, str]:
         """Chunk-safe synthesis via the injected cloning engine (Chatterbox)."""
         chunks = chunk_text(text, max_chars=_CHUNK_MAX_CHARS)
@@ -211,10 +312,10 @@ class SpeechService:
                         profile=profile,
                         text=chunk,
                         language=engine_language,
-                        exaggeration=request.exaggeration,
-                        cfg_weight=request.cfg_weight,
-                        temperature=request.temperature,
-                        seed=request.seed,
+                        exaggeration=exaggeration,
+                        cfg_weight=cfg_weight,
+                        temperature=temperature,
+                        seed=seed,
                     )
                 )
                 sample_rate = result.sample_rate

@@ -13,7 +13,9 @@ from ai.registry import get_engine as get_engine_singleton
 from app.core.config import Settings, get_settings
 from app.core.rate_limit import RateLimiter, client_key
 from app.db.session import get_session_factory
+from app.repositories.document_repo import DocumentSectionRepository
 from app.services.ai_providers import AiProviderRegistry, build_default_registry
+from app.services.documents import DocumentService, ReadingService
 from app.services.speech_service import SpeechService
 from app.services.storage import LocalStorage
 from app.services.story_service import StoryService
@@ -80,6 +82,20 @@ def story_service(registry: AiProviderRegistryDep) -> StoryService:
     return StoryService(registry=registry)
 
 
+def document_service(session: SessionDep, settings: SettingsDep) -> DocumentService:
+    return DocumentService(session=session, settings=settings)
+
+
+DocumentServiceDep = Annotated[DocumentService, Depends(document_service)]
+
+
+def reading_service(session: SessionDep) -> ReadingService:
+    return ReadingService(DocumentSectionRepository(session))
+
+
+ReadingServiceDep = Annotated[ReadingService, Depends(reading_service)]
+
+
 VoiceServiceDep = Annotated[VoiceService, Depends(voice_service)]
 SpeechServiceDep = Annotated[SpeechService, Depends(speech_service)]
 StoryServiceDep = Annotated[StoryService, Depends(story_service)]
@@ -138,5 +154,23 @@ def limit_story(request: Request, settings: SettingsDep) -> None:
     if not settings.rate_limit_enabled:
         return
     _limiter("story requests", settings.rate_limit_story_per_hour, 3600.0).check(
+        client_key(request)
+    )
+
+
+def limit_book_ingest(request: Request, settings: SettingsDep) -> None:
+    """Guards PDF upload and URL fetch -- the latter makes an outbound request
+    on the server's behalf, so it deserves its own, tighter budget."""
+    if not settings.rate_limit_enabled:
+        return
+    _limiter("book ingest requests", settings.rate_limit_book_ingest_per_hour, 3600.0).check(
+        client_key(request)
+    )
+
+
+def limit_book_narrate(request: Request, settings: SettingsDep) -> None:
+    if not settings.rate_limit_enabled:
+        return
+    _limiter("book narration requests", settings.rate_limit_book_narrate_per_hour, 3600.0).check(
         client_key(request)
     )

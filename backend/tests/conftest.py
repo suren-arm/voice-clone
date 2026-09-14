@@ -120,3 +120,99 @@ def created_voice(client, wav_bytes) -> dict:
     )
     assert response.status_code == 201, response.text
     return response.json()
+
+
+# -- PDF fixtures (Book Reader) ----------------------------------------------
+#
+# Built with fpdf2 + a bundled DejaVu Sans copy (tests/fixtures/fonts/, MIT/
+# Bitstream-Vera licensed, redistribution explicitly permitted -- see the
+# LICENSE file alongside it) rather than the host's system fonts: a CI image
+# with no fonts installed must not turn these into flaky skips, and a real
+# Armenian PDF needs a font with Armenian glyph coverage, which the base14
+# PDF fonts (Helvetica etc.) do not have.
+
+_FONT_PATH = Path(__file__).resolve().parent / "fixtures" / "fonts" / "DejaVuSans.ttf"
+
+
+def make_pdf_bytes(pages: list[str]) -> bytes:
+    """One page per string in ``pages``, real extractable Unicode text."""
+    from fpdf import FPDF
+
+    pdf = FPDF()
+    pdf.add_font("DejaVu", "", str(_FONT_PATH))
+    for text in pages:
+        pdf.add_page()
+        pdf.set_font("DejaVu", size=14)
+        pdf.multi_cell(0, 10, text)
+    return bytes(pdf.output())
+
+
+def make_encrypted_pdf_bytes(password: str = "secret123") -> bytes:
+    import io
+
+    from pypdf import PdfWriter
+
+    writer = PdfWriter()
+    writer.add_blank_page(width=200, height=200)
+    writer.encrypt(user_password=password, owner_password=password)
+    buffer = io.BytesIO()
+    writer.write(buffer)
+    return buffer.getvalue()
+
+
+def make_scanned_pdf_bytes() -> bytes:
+    """A PDF with a real page and an image, but deliberately no text layer."""
+    import io
+
+    from fpdf import FPDF
+    from PIL import Image
+
+    image = Image.new("RGB", (200, 200), color=(240, 240, 240))
+    image_buffer = io.BytesIO()
+    image.save(image_buffer, format="JPEG")
+    image_buffer.seek(0)
+
+    pdf = FPDF()
+    pdf.add_page()
+    pdf.image(image_buffer, x=0, y=0, w=200, h=200)
+    return bytes(pdf.output())
+
+
+@pytest.fixture
+def english_pdf_bytes() -> bytes:
+    return make_pdf_bytes(
+        [
+            "Chapter One\n\nOnce upon a time, in a quiet town, a fox and a rabbit became friends.",
+            "Chapter Two\n\nTogether they explored the forest and found a hidden lake.",
+        ]
+    )
+
+
+@pytest.fixture
+def armenian_pdf_bytes() -> bytes:
+    return make_pdf_bytes(
+        [
+            "Գլուխ մեկ\n\nՄի անգամ մի փոքրիկ քաղաքում ապրում էր մի աղջիկ։",
+            "Գլուխ երկու\n\nՆա հանդիպեց մի սկյուռիկի անտառում։",
+        ]
+    )
+
+
+@pytest.fixture
+def mixed_language_pdf_bytes() -> bytes:
+    return make_pdf_bytes(
+        [
+            "Chapter One\n\nOnce upon a time, in a quiet town, a fox and a rabbit became friends.",
+            "Գլուխ երկու\n\nՆա հանդիպեց մի սկյուռիկի անտառում։",
+        ]
+    )
+
+
+@pytest.fixture
+def encrypted_pdf_bytes() -> bytes:
+    return make_encrypted_pdf_bytes()
+
+
+@pytest.fixture
+def scanned_pdf_bytes() -> bytes:
+    return make_scanned_pdf_bytes()

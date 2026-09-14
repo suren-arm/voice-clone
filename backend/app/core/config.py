@@ -106,6 +106,35 @@ class Settings(BaseSettings):
 
     rate_limit_story_per_hour: int = 30
 
+    # -- book reader: document ingestion (PDF upload / HTTP(S) link) -------
+    # Deliberately separate from max_upload_bytes (reference audio): PDFs and
+    # audio have unrelated realistic size ranges, and letting one setting
+    # bound both would either starve legitimate books or accept oversized
+    # audio uploads.
+    max_pdf_bytes: int = 20 * 1024 * 1024
+    max_pdf_pages: int = 500
+    # Same cap applies to a PDF fetched from a URL; a remote *HTML* page has
+    # no separate cap of its own -- it is capped by the same constant, since
+    # a normal article/book page is far smaller than this ceiling in practice.
+    max_remote_download_bytes: int = 20 * 1024 * 1024
+    book_fetch_connect_timeout_seconds: float = 5.0
+    book_fetch_read_timeout_seconds: float = 20.0
+    book_fetch_max_redirects: int = 5
+    # How much text one "Start Reading" call may synthesize. Separate from
+    # (and larger than) speech.ABSOLUTE_MAX_TEXT_CHARS, which bounds a single
+    # hand-typed/generated-story request -- a book's selected page range is
+    # expected to be longer, but must still fit inside Render's request
+    # timeout on a CPU instance, so this is a deliberately bounded "batch",
+    # not the whole book. See README.md's Book Reader section.
+    max_book_narration_chars: int = 12_000
+    # Extracted documents (metadata + section text, never the original PDF
+    # bytes -- see services/documents/document_service.py) older than this
+    # are swept on startup, mirroring LocalStorage.cleanup_tmp(). Books are
+    # not meant to be a permanent library; re-upload or re-fetch is cheap.
+    document_retention_hours: int = 24
+    rate_limit_book_ingest_per_hour: int = 20
+    rate_limit_book_narrate_per_hour: int = 30
+
     # -- validators --------------------------------------------------------
     @field_validator("cors_origins", mode="before")
     @classmethod

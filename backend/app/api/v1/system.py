@@ -51,6 +51,10 @@ def system_info(engine: EngineDep, settings: SettingsDep) -> SystemInfo:
             max_text_chars=settings.max_text_chars,
             max_voices=settings.max_voices,
             require_consent=settings.require_consent,
+            max_pdf_bytes=settings.max_pdf_bytes,
+            max_pdf_pages=settings.max_pdf_pages,
+            max_remote_download_bytes=settings.max_remote_download_bytes,
+            max_book_narration_chars=settings.max_book_narration_chars,
         ),
         accepted_audio_formats=sorted(ext.lstrip(".") for ext in ALLOWED_EXTENSIONS),
     )

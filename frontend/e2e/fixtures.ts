@@ -88,9 +88,42 @@ export function wavBytes(seconds = 1): Buffer {
  * create -> list -> generate -> delete sequence a real backend would see,
  * including the cascade delete.
  */
+interface BookSectionRecord {
+  index: number;
+  title: string | null;
+  pageNumber: number | null;
+  charCount: number;
+  text: string;
+}
+
+interface BookRecord {
+  document: Record<string, unknown>;
+  sections: BookSectionRecord[];
+}
+
+function e2eBook(id: string): BookRecord {
+  const text = 'Once upon a time, a fox and a rabbit became friends in a quiet meadow.';
+  return {
+    document: {
+      id,
+      title: 'The Fox and the Rabbit',
+      sourceType: 'pdf_upload',
+      sourceUrl: null,
+      originalFilename: 'story.pdf',
+      language: 'en',
+      pageCount: 1,
+      sectionCount: 1,
+      charCount: text.length,
+      createdAt: new Date().toISOString(),
+    },
+    sections: [{ index: 0, title: 'The Fox and the Rabbit', pageNumber: 1, charCount: text.length, text }],
+  };
+}
+
 export async function stubApi(page: Page) {
   const voices: VoiceRecord[] = [];
   const generations: Record<string, unknown>[] = [];
+  const books: Record<string, BookRecord> = {};
   let counter = 0;
 
   const json = (route: Route, body: unknown, status = 200) =>
@@ -209,6 +242,113 @@ export async function stubApi(page: Page) {
       const index = generations.findIndex((item) => item.id === id);
       if (index >= 0) generations.splice(index, 1);
       return json(route, { id, deleted: true });
+    }
+
+    if (path.includes('/generations/') && method === 'GET') {
+      const id = path.split('/').pop()!;
+      const generation = generations.find((item) => item.id === id);
+      if (!generation) return json(route, { error: { code: 'generation_not_found', message: 'Not found.' } }, 404);
+      return json(route, generation);
+    }
+
+    if (path.endsWith('/voices/defaults')) {
+      return json(route, [
+        {
+          id: 'default_en_male',
+          name: 'English (Male, Classic)',
+          language: 'en',
+          createdAt: new Date().toISOString(),
+          engine: 'espeak-ng',
+          engineVariant: 'en-us',
+          referenceDurationSeconds: 0,
+          referenceSampleRate: 22050,
+          source: 'system',
+          generationCount: 0,
+          lastUsedAt: null,
+          consentGiven: true,
+          hasConditioningCache: false,
+          sampleUrl: null,
+        },
+      ]);
+    }
+
+    // -- Book Reader ----------------------------------------------------------
+
+    if (path.endsWith('/books/upload') && method === 'POST') {
+      counter += 1;
+      const id = `doc_e2e${String(counter).padStart(8, '0')}`;
+      books[id] = e2eBook(id);
+      return json(route, books[id]!.document, 201);
+    }
+
+    if (path.endsWith('/books/from-url') && method === 'POST') {
+      counter += 1;
+      const id = `doc_e2e${String(counter).padStart(8, '0')}`;
+      books[id] = e2eBook(id);
+      return json(route, books[id]!.document, 201);
+    }
+
+    if (path.match(/\/books\/[^/]+\/sections\/\d+$/)) {
+      const [, id, index] = path.match(/\/books\/([^/]+)\/sections\/(\d+)$/)!;
+      const book = books[id!];
+      const section = book?.sections[Number(index)];
+      if (!section) return json(route, { error: { code: 'not_found', message: 'Not found.' } }, 404);
+      return json(route, section);
+    }
+
+    if (path.match(/\/books\/[^/]+\/sections$/)) {
+      const [, id] = path.match(/\/books\/([^/]+)\/sections$/)!;
+      const book = books[id!];
+      if (!book) return json(route, { error: { code: 'document_not_found', message: 'Not found.' } }, 404);
+      return json(route, {
+        items: book.sections.map(({ text: _text, ...summary }) => summary),
+        meta: { total: book.sections.length, limit: 20, offset: 0 },
+      });
+    }
+
+    if (path.match(/\/books\/[^/]+\/narrate$/) && method === 'POST') {
+      const [, id] = path.match(/\/books\/([^/]+)\/narrate$/)!;
+      const payload = request.postDataJSON() as { voiceId: string; language: string };
+      counter += 1;
+      const genId = `gen_e2e${String(counter).padStart(9, '0')}`;
+      const generation = {
+        id: genId,
+        voiceId: payload.voiceId,
+        text: books[id!]?.sections[0]?.text ?? '',
+        language: payload.language,
+        createdAt: new Date().toISOString(),
+        audioUrl: `/api/v1/generations/${genId}/audio`,
+        durationSeconds: 3,
+        sampleRate: 22050,
+        sizeBytes: 132300,
+        generationSeconds: 0.5,
+        realTimeFactor: 0.16,
+        engine: 'espeak-ng',
+        watermarked: false,
+        experimental: false,
+        notice: null,
+        backgroundSound: 'none',
+        backgroundApplied: false,
+        backgroundNotice: null,
+      };
+      generations.unshift(generation);
+      return json(route, {
+        generationId: genId,
+        documentId: id,
+        range: { kind: 'entire' },
+        audioUrl: generation.audioUrl,
+        durationSeconds: generation.durationSeconds,
+        notice: null,
+        backgroundApplied: false,
+        backgroundNotice: null,
+      }, 201);
+    }
+
+    if (path.match(/\/books\/[^/]+$/) && method === 'GET') {
+      const [, id] = path.match(/\/books\/([^/]+)$/)!;
+      const book = books[id!];
+      if (!book) return json(route, { error: { code: 'document_not_found', message: 'Not found.' } }, 404);
+      return json(route, book.document);
     }
 
     return json(route, { error: { code: 'not_found', message: 'Unhandled route in stub.' } }, 404);
