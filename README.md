@@ -66,6 +66,7 @@ Browser ──HTTPS──▶ FastAPI ──┼─ stories ─▶ StoryService �
 - [GPU setup](#gpu-setup)
 - [Configuration](#configuration)
 - [Project structure](#project-structure)
+- [Design system](#design-system)
 - [API](#api)
 - [Testing](#testing)
 - [Security](#security)
@@ -735,7 +736,8 @@ voice-clone/
 ├── frontend/
 │   ├── src/
 │   │   ├── app/                 App Router pages, incl. fairy-tale/ · book-reader/
-│   │   ├── components/          shared UI
+│   │   │                        globals.css holds the design tokens (see Design system)
+│   │   ├── components/          shared UI (Dropzone, AudioPlayer, Field, Card, …)
 │   │   ├── features/            voices/ · speech/ · story/ · book-reader/
 │   │   ├── hooks/               useRecorder · useVoices · useDefaultVoices · useSystemInfo · …
 │   │   ├── services/            the only code that knows the API exists (incl. books.ts)
@@ -752,6 +754,44 @@ voice-clone/
 
 `ai/` sits outside `backend/` on purpose: it has no web dependencies, so a
 standalone GPU worker can import it later without dragging FastAPI along.
+
+---
+
+## Design system
+
+The audience is children, with adults nearby. The interface is built for the
+child first; anything an adult or an engineer needs is one click away rather
+than on the front door.
+
+**Tokens live in `frontend/src/app/globals.css`.** Components never hard-code a
+colour, radius or spacing value.
+
+| Token group | Purpose |
+|---|---|
+| `--joy-grape` / `-sky` / `-sun` / `-mint` / `-coral` (+ `-soft`) | One hue per feature, so a colour consistently means a place in the app: fairy tale is grape, Book Reader is sky, text-to-speech is mint, voice creation is coral |
+| `--bg`, `--bg-sunken`, `--text`, `--text-muted`, `--border`, `--border-strong` | Surfaces and type, each with a `prefers-color-scheme: dark` value |
+| `--accent`, `--accent-soft` | The single interactive colour |
+| `--radius`, `--radius-lg`, `--radius-pill` | Soft geometry |
+| `--space-1` … `--space-7` | The only spacing scale |
+| `--tap: 44px` | Minimum tap target (WCAG 2.5.5), applied to buttons, nav links and segmented options |
+| `--font`, `--font-reading` | The UI stack includes `Noto Sans Armenian`, so Հայերեն renders in family rather than falling back mid-sentence |
+
+**Rules the UI follows:**
+
+- **Plain language over product language.** Fields ask "Who is in your story?",
+  not "Characters". Buttons say "✨ Create My Story", not "Generate".
+- **Engineering detail is disclosed, never deleted.** Model, device, sample
+  rate and licence sit behind *Studio status* on the home page; render time,
+  RTF and file size behind *Technical details* on the result screen; the AI
+  provider behind *Advanced settings* on the story form.
+- **Joyful, not noisy.** One static gradient, one scale transform on drag-over.
+  No animated backgrounds, no autoplay, no sound effects. A global
+  `prefers-reduced-motion: reduce` block turns off what motion there is.
+- **Every emoji is decorative.** All are `aria-hidden="true"` beside a real text
+  label, so a screen reader hears "Read a Book", not "open book Read a Book".
+
+A full account of what changed and why — including what was deliberately left
+alone — is in **[REFACTORING_REVIEW.md](REFACTORING_REVIEW.md)**.
 
 ---
 
@@ -827,7 +867,7 @@ pytest tests/unit tests/api tests/integration
 # Real cloning model — opt-in, downloads weights
 pytest -m ai tests/ai
 
-# Frontend — 70 unit tests
+# Frontend — 71 unit tests
 cd frontend && npm run test:run
 
 # End-to-end — 16 tests, desktop + mobile viewports
@@ -842,6 +882,8 @@ npm run test:e2e
 | `tests/ai` | Real Chatterbox: language set, conditioning round trip, synthesis, **watermark detectability**, RTF |
 | `frontend` (Vitest) | Formatting, file validation, the API client's error handling, the audio player, the dropzone, the generate form, the Book Reader form (upload, URL load, reading-range selection, narration, Armenian blocking, resume) |
 | `e2e` (Playwright) | Create → generate → play → download → delete, real `MediaRecorder` capture, the Armenian labelling path, API-failure handling, phone-width layout, Book Reader upload/URL/preset flow |
+
+Total: **359 tests** across four layers.
 
 CI never loads a model: `requirements-ci.txt` omits torch entirely and
 everything runs against `MockEngine`. The real-model suite is a separate,
