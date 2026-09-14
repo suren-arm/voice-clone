@@ -29,7 +29,11 @@ import {
   loadBookReaderSession,
   saveBookReaderSession,
 } from '@/utils/bookReaderSession';
-import { DEFAULT_BACKGROUND_VOLUME, isClonedVoiceBlockedForLanguage } from '@/utils/voiceCapability';
+import {
+  DEFAULT_BACKGROUND_VOLUME,
+  isClonedVoiceBlockedForLanguage,
+  preferredVoiceSource,
+} from '@/utils/voiceCapability';
 
 type ReadingPreset = 'standard' | 'bedtime' | 'fairyTale' | 'study';
 
@@ -45,6 +49,7 @@ export function BookReaderForm() {
   const [speed, setSpeed] = useState<ReadingSpeed>(1);
 
   const [voiceSource, setVoiceSource] = useState<VoiceSource>('default');
+  const [voiceSourceTouched, setVoiceSourceTouched] = useState(false);
   const [voiceId, setVoiceId] = useState('');
   const [backgroundSound, setBackgroundSound] = useState<BackgroundSound>('none');
   const [backgroundVolume, setBackgroundVolume] = useState(DEFAULT_BACKGROUND_VOLUME);
@@ -108,6 +113,12 @@ export function BookReaderForm() {
   const languages = useMemo(() => info?.languages ?? [], [info]);
   const cloningBlocked =
     voiceSource === 'cloned' && isClonedVoiceBlockedForLanguage(languages, language);
+
+  // Same default as the other two screens -- see preferredVoiceSource().
+  useEffect(() => {
+    if (voiceSourceTouched) return;
+    setVoiceSource(preferredVoiceSource(voices, languages, language));
+  }, [voiceSourceTouched, voices, languages, language]);
   const canNarrate = document !== null && Boolean(voiceId) && !cloningBlocked && !narrating;
 
   async function handleNarrate() {
@@ -226,7 +237,10 @@ export function BookReaderForm() {
               clonedVoices={voices}
               defaultVoices={defaultVoices}
               voiceSource={voiceSource}
-              onVoiceSourceChange={setVoiceSource}
+              onVoiceSourceChange={(next) => {
+                setVoiceSourceTouched(true);
+                setVoiceSource(next);
+              }}
               voiceId={voiceId}
               onVoiceIdChange={setVoiceId}
               backgroundSound={backgroundSound}

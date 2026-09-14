@@ -64,3 +64,26 @@ export const BACKGROUND_SOUND_OPTIONS: { value: BackgroundSound; label: string }
  * is a starting point rather than the only safeguard.
  */
 export const DEFAULT_BACKGROUND_VOLUME = 15;
+
+/**
+ * Which voice source a screen should start on.
+ *
+ * This exists because the three screens disagreed: Text to Speech started on
+ * "My Voice" (neural cloning) while Fairy Tale and Book Reader started on "A
+ * Studio Voice" (espeak-ng formant synthesis). Those are different engines
+ * with very different naturalness, so the same user comparing the same
+ * sentence across two screens heard a large quality gap and reasonably
+ * concluded the fairy-tale path was degrading the audio. It was not -- they
+ * were simply never being read by the same voice.
+ *
+ * Prefer the user's own voice when they have one that can speak the chosen
+ * language; otherwise a studio voice, which always can.
+ */
+export function preferredVoiceSource(
+  clonedVoices: Voice[],
+  languages: LanguageOption[],
+  language: string,
+): 'cloned' | 'default' {
+  if (isClonedVoiceBlockedForLanguage(languages, language)) return 'default';
+  return voicesForLanguage(clonedVoices, language).length > 0 ? 'cloned' : 'default';
+}

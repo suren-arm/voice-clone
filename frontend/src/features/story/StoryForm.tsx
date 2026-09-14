@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Button } from '@/components/Button';
 import { Callout } from '@/components/Callout';
 import { Card } from '@/components/Card';
@@ -27,7 +27,11 @@ import type {
 } from '@/types';
 import { GenerationResult } from '@/features/speech/GenerationResult';
 import { VoiceAndBackgroundFields } from '@/features/speech/VoiceAndBackgroundFields';
-import { DEFAULT_BACKGROUND_VOLUME, isClonedVoiceBlockedForLanguage } from '@/utils/voiceCapability';
+import {
+  DEFAULT_BACKGROUND_VOLUME,
+  isClonedVoiceBlockedForLanguage,
+  preferredVoiceSource,
+} from '@/utils/voiceCapability';
 
 const AGE_GROUP_OPTIONS: StoryAgeGroup[] = ['3-5', '6-8', '9-12'];
 const LENGTH_OPTIONS: { value: StoryLength; label: string }[] = [
@@ -64,6 +68,7 @@ export function StoryForm() {
   const [storyText, setStoryText] = useState('');
 
   const [voiceSource, setVoiceSource] = useState<VoiceSource>('default');
+  const [voiceSourceTouched, setVoiceSourceTouched] = useState(false);
   const [voiceId, setVoiceId] = useState('');
   const [backgroundSound, setBackgroundSound] = useState<BackgroundSound>('none');
   const [backgroundVolume, setBackgroundVolume] = useState(DEFAULT_BACKGROUND_VOLUME);
@@ -111,6 +116,14 @@ export function StoryForm() {
   const languages = useMemo(() => info?.languages ?? [], [info]);
   const cloningBlocked =
     voiceSource === 'cloned' && isClonedVoiceBlockedForLanguage(languages, language);
+
+  // Start on the same voice Text to Speech would use, so the two screens do
+  // not read the same sentence in two different engines. Once the user picks
+  // for themselves, stop second-guessing them.
+  useEffect(() => {
+    if (voiceSourceTouched) return;
+    setVoiceSource(preferredVoiceSource(voices, languages, language));
+  }, [voiceSourceTouched, voices, languages, language]);
   const canNarrate =
     Boolean(voiceId) && !cloningBlocked && storyText.trim().length > 0 && !narrating;
 
@@ -328,7 +341,10 @@ export function StoryForm() {
               clonedVoices={voices}
               defaultVoices={defaultVoices}
               voiceSource={voiceSource}
-              onVoiceSourceChange={setVoiceSource}
+              onVoiceSourceChange={(next) => {
+                setVoiceSourceTouched(true);
+                setVoiceSource(next);
+              }}
               voiceId={voiceId}
               onVoiceIdChange={setVoiceId}
               backgroundSound={backgroundSound}
