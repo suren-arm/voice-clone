@@ -81,6 +81,8 @@ Browser ──HTTPS──▶ FastAPI ──┼─ stories ─▶ StoryService �
   - [Deploying the backend to Render](#deploying-the-backend-to-render)
   - [Deployment verification](#deployment-verification)
   - [Deployment troubleshooting](#deployment-troubleshooting)
+- [Why Cloudflare and Render Are Both Used](#why-cloudflare-and-render-are-both-used)
+- [Hosting Alternatives](#hosting-alternatives)
 - [Roadmap](#roadmap)
 
 ---
@@ -1257,6 +1259,76 @@ file deliberately omits the heavy `torch`/`chatterbox-tts` stack); and that
 ffmpeg/espeak-ng are present (they are baked into `backend/Dockerfile.render`
 already — if a custom Docker change removed them, narration and background
 mixing break silently for real audio while the mock engine still passes).
+
+---
+
+## Why Cloudflare and Render Are Both Used
+
+A full evidence-based review of this question — including whether the
+backend could move to Cloudflare, and whether that would be cheaper — lives
+in **[CLOUDFLARE_BACKEND_FEASIBILITY.md](CLOUDFLARE_BACKEND_FEASIBILITY.md)**.
+Short version:
+
+**Cloudflare** hosts the frontend (Cloudflare Pages): a static Next.js
+export, served free from Cloudflare's global CDN with automatic HTTPS. No
+Workers, no Functions, no server process — verified by the absence of any
+`wrangler` config anywhere in this repository. This is the right tool for a
+static, client-rendered app and costs nothing.
+
+**Render** hosts the backend: a single, always-warm Python process that
+keeps a ~350M-parameter PyTorch voice-cloning model (Chatterbox) resident in
+memory, shells out to `ffmpeg` and `espeak-ng` as real subprocesses, and
+reads/writes a persistent disk (SQLite database, cloned-voice reference
+audio, generation history). None of that is optional plumbing — it is the
+actual workload.
+
+**Why the backend is not on Cloudflare:** Cloudflare Workers — the product
+most people mean by "run it on Cloudflare" — cannot run this backend under
+any interpretation of "compatible," for three independent reasons, any one
+of which alone is disqualifying:
+
+1. **A 128 MB memory ceiling, hard-capped on every plan.** The voice-cloning
+   model alone is roughly 1.4 GB in memory — over 10× the entire budget,
+   before a single request is served.
+2. **No subprocess execution, at any tier.** `ffmpeg` and `espeak-ng` are
+   invoked as real subprocesses throughout this codebase (`ai/audio_mix.py`,
+   `ai/espeak_engine.py`) — Workers' sandbox does not run native binaries.
+3. **No persistent filesystem.** Workers' filesystem is in-memory and
+   destroyed with the isolate; cloned voices and generation history need to
+   outlive a single request by months, not milliseconds.
+
+**Cloudflare Containers** — a real Docker-container product, distinct from
+Workers — is the honest alternative that actually could run this exact
+image, and the feasibility review evaluates it in full rather than dismissing
+it. The blocker there is different: Container disk is ephemeral by design,
+wiped on every restart, so adopting it safely means rewriting this app's
+storage onto Durable Objects/R2 first — a real re-architecture, not a
+redeploy — and even then, keeping a resident model warm (to avoid re-paying
+its load cost on every cold start) erodes the pay-per-use pricing that makes
+Containers attractive for bursty workloads in the first place. **Not
+recommended today**; see the full report for the complete analysis, cost
+comparison, and a phased path if this is ever revisited.
+
+The one genuinely easy, low-risk Cloudflare win identified — and not yet
+adopted, because the benefit is currently marginal — is moving the
+AI-provider proxy (`app/services/ai_providers/`, a stateless HTTP passthrough
+to OpenAI/Gemini/Anthropic/Ollama with no local compute) to a Worker. Worth
+revisiting if Render's own cost or load ever becomes a real constraint.
+
+## Hosting Alternatives
+
+| Option | Verdict | Why |
+|---|---|---|
+| **Current: Cloudflare Pages + Render** (recommended, unchanged) | Keep | Already matches the workload — static/CDN for the frontend, persistent resident-model host for the backend. ~$8.25/month. |
+| Cloudflare Workers for the whole backend | **Not viable** | 128 MB memory ceiling, no subprocess execution, no persistent filesystem — see above. |
+| Cloudflare Containers for the whole backend | Possible, not recommended now | Ephemeral disk requires a storage rewrite (Durable Objects/R2) before it's safe; not clearly cheaper once kept warm to avoid cold-starting the model on every request. |
+| Hybrid: AI-provider proxy on a Cloudflare Worker, everything else on Render | Good future option, not urgent | Real, low-risk win for the one part of the backend that's already a stateless HTTP proxy — but adds a third deployed service for a currently-marginal benefit. |
+
+See **[CLOUDFLARE_BACKEND_FEASIBILITY.md](CLOUDFLARE_BACKEND_FEASIBILITY.md)**
+for the full decision matrix, cost comparison (current published pricing,
+not assumed), free-tier analysis, and a phased migration plan for if this is
+ever revisited.
+
 
 ---
 
