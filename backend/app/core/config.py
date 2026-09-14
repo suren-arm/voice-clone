@@ -65,7 +65,6 @@ class Settings(BaseSettings):
     max_reference_seconds: float = 120.0
     max_text_chars: int = 2000
     max_voices: int = 100
-    generation_timeout_seconds: int = 300
     require_consent: bool = True
 
     # -- rate limiting -----------------------------------------------------

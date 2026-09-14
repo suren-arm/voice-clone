@@ -1,10 +1,5 @@
 import type { Limits } from '@/types';
 
-export interface FieldError {
-  field: string;
-  message: string;
-}
-
 export function validateVoiceName(name: string): string | null {
   const trimmed = name.trim();
   if (!trimmed) return 'Give this voice a name.';

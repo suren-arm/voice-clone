@@ -48,18 +48,6 @@ export function formatRelativeTime(iso: string, now: Date = new Date()): string 
   return then.toLocaleDateString();
 }
 
-export function formatDateTime(iso: string): string {
-  const date = new Date(iso);
-  if (Number.isNaN(date.getTime())) return '';
-  return date.toLocaleString(undefined, {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
-}
-
 /** Trim long text for a list row without cutting mid-word where avoidable. */
 export function truncate(text: string, maxLength = 120): string {
   const collapsed = text.replace(/\s+/g, ' ').trim();
